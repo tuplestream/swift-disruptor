@@ -1,7 +1,8 @@
 import XCTest
 
-import swift_disruptorTests
+import DisruptorTests
 
 var tests = [XCTestCaseEntry]()
-tests += DisruptorTests.allTests()
+tests += DisruptorTests.__allTests()
+
 XCTMain(tests)

@@ -17,3 +17,16 @@ protocol Sequencer: Sequenced, Cursored {
     func isAvailable(sequence: UInt64) -> Bool
     func getHighestPublishedSequence(nextSequence: UInt64, availableSequence: UInt64) -> UInt64
 }
+
+extension Sequencer {
+
+    var bufferSize: UInt64 {
+        get {
+            return 0
+        }
+    }
+}
+
+final class SingleProducerSequencer {
+    
+}

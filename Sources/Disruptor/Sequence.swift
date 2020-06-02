@@ -1,15 +1,25 @@
 import Foundation
-import SwiftAtomics
+import CAtomics
 
 class Sequence {
 
-    init() {
+    fileprivate var ptr: AtomicUInt64
+
+    init(value: UInt64 = 0) {
+        self.ptr = AtomicUInt64()
+        CAtomicsInitialize(&ptr, value)
     }
 
     func get() -> UInt64 {
-        var foo = AtomicInt()
-        return 0
+        return CAtomicsLoad(&ptr, .relaxed)
     }
-    
-    func
+
+    func set(_ value: UInt64) {
+        CAtomicsStore(&ptr, value, .sequential)
+    }
+
+    func setVolatile(_ value: UInt64) {
+        CAtomicsStore(&ptr, value, .relaxed)
+    }
+
 }
