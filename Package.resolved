@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "SwiftAtomics",
+        "repositoryURL": "https://github.com/glessard/swift-atomics",
+        "state": {
+          "branch": null,
+          "revision": "57c665b1b71bf4ed3ad58291a4ce4296cb327075",
+          "version": "6.2.1"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,25 +1,21 @@
-import Foundation
 import CAtomics
 
 class Sequence {
 
-    fileprivate var ptr: AtomicUInt64
+    private var value = UnsafeMutablePointer<AtomicUInt64>.allocate(capacity: 1)
 
-    init(value: UInt64 = 0) {
-        self.ptr = AtomicUInt64()
-        CAtomicsInitialize(&ptr, value)
+    init(initialValue: UInt64 = 0) {
+        CAtomicsInitialize(self.value, 0)
     }
 
     func get() -> UInt64 {
-        return CAtomicsLoad(&ptr, .relaxed)
+        return CAtomicsLoad(value, .relaxed)
     }
 
     func set(_ value: UInt64) {
-        CAtomicsStore(&ptr, value, .sequential)
     }
 
     func setVolatile(_ value: UInt64) {
-        CAtomicsStore(&ptr, value, .relaxed)
     }
 
 }

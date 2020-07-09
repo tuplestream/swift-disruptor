@@ -8,12 +8,43 @@
 import Foundation
 
 public final class RingBuffer: Cursored, Sequenced {
+    var bufferSize: UInt64
 
-    private let sequencer: Sequencer
+    var remainingCapacity: UInt64
+
+
+    public init() {
+        bufferSize = 0
+        remainingCapacity = 0
+    }
+
+    func hasAvailableCapacity(required: Int) -> Bool {
+        return true
+    }
+
+    func next() -> UInt64 {
+        return 0
+    }
+
+    func next(_ n: Int) -> UInt64 {
+        return 0
+    }
+
+    func publish(_ sequence: UInt64) {
+
+    }
+
+    func publish(low: UInt64, high: UInt64) {
+
+    }
+
+
+//    private let sequencer: Sequencer
 
     var cursor: UInt64 {
         get {
-            return sequencer.cursor
+//            return sequencer.cursor
+            return 0
         }
     }
 
