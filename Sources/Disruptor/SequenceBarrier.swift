@@ -28,7 +28,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
             return availableSequence
         }
 
-        return sequencer.getHighestPublishedSequence(nextSequence: sequence, availableSequence: availableSequence)
+        return sequencer.getHighestPublishedSequence(lowerBound: sequence, availableSequence: availableSequence)
     }
 
     var cursor: UInt64 {

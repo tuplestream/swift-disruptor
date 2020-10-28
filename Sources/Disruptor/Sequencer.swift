@@ -24,7 +24,7 @@ protocol Cursored {
 protocol Sequencer: Sequenced, Cursored {
     func claim(sequence: UInt64)
     func isAvailable(sequence: UInt64) -> Bool
-    func getHighestPublishedSequence(nextSequence: UInt64, availableSequence: UInt64) -> UInt64
+    func getHighestPublishedSequence(lowerBound: UInt64, availableSequence: UInt64) -> UInt64
 }
 
 final class SequenceUtils {
@@ -38,7 +38,7 @@ final class SequenceUtils {
     }
 }
 
-final class MultiProducerSequencer {
+final class MultiProducerSequencer: Sequencer {
 
     private static let initialCursorValue = -1
     private static let scale = MemoryLayout<Int>.size
@@ -48,6 +48,7 @@ final class MultiProducerSequencer {
     private var availableBuffer: [Int]
     private let indexMask: Int
     private let indexShift: Int
+    private let waitStrategy: WaitStrategy
     private var gatingSequences: [Sequence]
 
     public init(bufferSize: Int, waitStrategy: WaitStrategy) {
@@ -55,8 +56,8 @@ final class MultiProducerSequencer {
         self.availableBuffer = Array(repeating: 0, count: bufferSize)
         self.indexMask = bufferSize - 1
         self.indexShift = Int(log2(Double(bufferSize)))
+        self.waitStrategy = waitStrategy
         self.gatingSequences = [Sequence()]
-
     }
 
     func claim(sequence: UInt64) {
@@ -66,14 +67,20 @@ final class MultiProducerSequencer {
     func isAvailable(sequence: UInt64) -> Bool {
         let index = calculateIndex(sequence)
         let flag = calculateAvailabilityFlag(sequence)
-        let foo = UnsafeMutablePointer<Int>(mutating: availableBuffer).advanced(by: index)
-        let val = volatile_load_int(UnsafeMutableRawPointer(foo))
-        return val == flag
+        let bufferAddress = UnsafeMutablePointer<Int>(mutating: availableBuffer).advanced(by: index)
+        return volatile_load_int(UnsafeMutableRawPointer(bufferAddress)) == flag
     }
 
-//    func getHighestPublishedSequence(nextSequence: UInt64, availableSequence: UInt64) -> UInt64 {
-//        <#code#>
-//    }
+    func getHighestPublishedSequence(lowerBound: UInt64, availableSequence: UInt64) -> UInt64 {
+        var sequence = lowerBound
+        while sequence <= availableSequence {
+            if !isAvailable(sequence: sequence) {
+                return sequence - 1
+            }
+            sequence += 1
+        }
+        return availableSequence
+    }
 
     var bufferSize: Int
 
@@ -134,15 +141,25 @@ final class MultiProducerSequencer {
 
     }
 
-//    func publish(_ sequence: UInt64) {
-//
-//    }
-//
-//    func publish(low: UInt64, high: UInt64) {
-//        <#code#>
-//    }
+    func publish(_ sequence: UInt64) {
+        setAvailable(sequence: sequence)
+        waitStrategy.signalAllWhenBlocking()
+    }
+
+    func publish(low: UInt64, high: UInt64) {
+        var l = low
+        while l <= high {
+            setAvailable(sequence: l)
+            l += 1
+        }
+        waitStrategy.signalAllWhenBlocking()
+    }
 
     var cursor: UInt64 = 0
+
+    private func setAvailable(sequence: UInt64) {
+        setAvailableBufferValue(index: calculateIndex(sequence), flag: calculateAvailabilityFlag(sequence))
+    }
 
     private func calculateIndex(_ sequence: UInt64) -> Int {
         return Int(sequence) & indexMask
