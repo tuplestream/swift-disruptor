@@ -1,3 +1,8 @@
+/*
+ Copyright 2020 TupleStream OÜ
+ See the LICENSE file for license information
+ SPDX-License-Identifier: Apache-2.0
+*/
 protocol Sequenced {
     var bufferSize: Int { get }
     var remainingCapacity: UInt64 { get }
@@ -65,5 +70,5 @@ protocol Sequencer: Sequenced, Cursored {
 //
 //    var cursor: UInt64
 //
-//    
+//
 //}

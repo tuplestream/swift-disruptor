@@ -1,3 +1,8 @@
+/*
+ Copyright 2020 TupleStream OÜ
+ See the LICENSE file for license information
+ SPDX-License-Identifier: Apache-2.0
+*/
 protocol SequenceBarrier {
     func waitFor(sequence: UInt64) throws -> UInt64
     var cursor: UInt64 { get }
