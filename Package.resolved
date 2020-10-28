@@ -2,12 +2,12 @@
   "object": {
     "pins": [
       {
-        "package": "SwiftAtomics",
-        "repositoryURL": "https://github.com/glessard/swift-atomics",
+        "package": "swift-atomics",
+        "repositoryURL": "https://github.com/apple/swift-atomics.git",
         "state": {
           "branch": null,
-          "revision": "57c665b1b71bf4ed3ad58291a4ce4296cb327075",
-          "version": "6.2.1"
+          "revision": "26e346cd64f6b92d4089e7fafe2f8e82f60ddb8c",
+          "version": "0.0.2"
         }
       }
     ]

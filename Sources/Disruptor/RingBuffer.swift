@@ -7,13 +7,14 @@
 
 import Foundation
 
-public final class RingBuffer: Cursored, Sequenced {
-    var bufferSize: UInt64
+public final class RingBuffer<E>: Cursored, Sequenced {
+
+    var bufferSize: Int
 
     var remainingCapacity: UInt64
 
 
-    public init() {
+    init(_ factory: () -> E, sequencer: Sequencer) {
         bufferSize = 0
         remainingCapacity = 0
     }

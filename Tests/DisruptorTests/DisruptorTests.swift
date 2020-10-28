@@ -2,11 +2,34 @@ import XCTest
 @testable import Disruptor
 
 final class DisruptorTests: XCTestCase {
-    func testExample() {
-        print("hi")
+
+    class MyEvent: CustomStringConvertible {
+        var value: Int = 0
+
+        var description: String {
+            get {
+                return "value: \(value)"
+            }
+        }
     }
 
-    static var allTests = [
-        ("testExample", testExample),
-    ]
+    class MyEventFactory: EventFactory {
+        typealias Event = MyEvent
+
+        func newInstance() -> DisruptorTests.MyEvent {
+            return MyEvent()
+        }
+    }
+
+    class MyEventHandler: EventHandler {
+        typealias Event = MyEvent
+
+        func onEvent(_ event: DisruptorTests.MyEvent, sequence: UInt64, endOfBatch: Bool) {
+            print("\(event) / seq: \(sequence)")
+        }
+    }
+
+    func overallTest() {
+
+    }
 }

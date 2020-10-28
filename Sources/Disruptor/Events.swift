@@ -1,4 +1,4 @@
-protocol EventFactory {
+public protocol EventFactory {
     associatedtype Event
     func newInstance() -> Event
 }
