@@ -47,7 +47,7 @@ final class SleepingWaitStrategy: WaitStrategy {
             counter -= 1
             sched_yield()
         } else {
-            Thread.sleep(forTimeInterval: 0.000001)
+            Thread.sleep(forTimeInterval: 0.0000001)
         }
         return counter
     }

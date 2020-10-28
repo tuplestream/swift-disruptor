@@ -7,15 +7,26 @@ import Foundation
 
 public final class RingBuffer<E>: Cursored, Sequenced {
 
-    var bufferSize: Int
+    public let bufferSize: Int
+    public private(set) var remainingCapacity: UInt64
 
-    var remainingCapacity: UInt64
-
+    private let indexMask: UInt64
+    private let entries: [E]
 
     init(_ factory: () -> E, sequencer: Sequencer) {
-        bufferSize = 0
+        precondition(sequencer.bufferSize > 1, "bufferSize must not be less than 1")
+        precondition(sequencer.bufferSize.nonzeroBitCount == 1, "bufferSize must be a power of 2")
+
+        bufferSize = sequencer.bufferSize
         remainingCapacity = 0
+        self.indexMask = UInt64(bufferSize) - 1
+        self.entries = Array(repeating: factory(), count: bufferSize)
     }
+
+//    public static func createMultiProducer(factory: () -> E, bufferSize: Int) -> RingBuffer<E> {
+//        let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: SleepingWaitStrategy())
+//        return RingBuffer<E>(factory, sequencer: sequencer)
+//    }
 
     func hasAvailableCapacity(required: Int) -> Bool {
         return true

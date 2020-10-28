@@ -14,9 +14,11 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-atomics.git",from: "0.0.1")
     ],
     targets: [
+        .target(name: "_Volatile", dependencies: []),
         .target(
             name: "Disruptor",
-            dependencies: [.product(name: "Atomics", package: "swift-atomics")]),
+            dependencies: [.target(name: "_Volatile"),
+                           .product(name: "Atomics", package: "swift-atomics")]),
         .testTarget(
             name: "DisruptorTests",
             dependencies: ["Disruptor"]),
