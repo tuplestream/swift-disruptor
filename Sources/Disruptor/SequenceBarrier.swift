@@ -4,8 +4,8 @@
  SPDX-License-Identifier: Apache-2.0
 */
 protocol SequenceBarrier {
-    func waitFor(sequence: UInt64) throws -> UInt64
-    var cursor: UInt64 { get }
+    func waitFor(sequence: Int64) throws -> Int64
+    var cursor: Int64 { get }
 }
 
 final class ProcessingSequenceBarrier: SequenceBarrier {
@@ -15,14 +15,19 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
     private let dependentSequence: Sequence
     private let sequencer: Sequencer
 
-    init(waitStrategy: WaitStrategy, cursorSequence: Sequence, dependentSequence: Sequence, sequencer: Sequencer) {
+    init(sequencer: Sequencer, waitStrategy: WaitStrategy, cursorSequence: Sequence, dependentSequences: [Sequence]) {
+        self.sequencer = sequencer
         self.waitStrategy = waitStrategy
         self.cursorSequence = cursorSequence
-        self.dependentSequence = dependentSequence
-        self.sequencer = sequencer
+
+        if dependentSequences.isEmpty {
+            self.dependentSequence = cursorSequence
+        } else {
+            self.dependentSequence = FixedSequenceGroup(sequences: dependentSequences)
+        }
     }
 
-    func waitFor(sequence: UInt64) throws -> UInt64 {
+    func waitFor(sequence: Int64) throws -> Int64 {
         let availableSequence = try waitStrategy.waitFor(sequence: sequence, cursor: cursorSequence, dependentSequence: dependentSequence, barrier: self)
         if availableSequence < sequence {
             return availableSequence
@@ -31,7 +36,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
         return sequencer.getHighestPublishedSequence(lowerBound: sequence, availableSequence: availableSequence)
     }
 
-    var cursor: UInt64 {
+    var cursor: Int64 {
         get {
             return cursorSequence.value
         }

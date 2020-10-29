@@ -29,7 +29,7 @@ final class DisruptorTests: XCTestCase {
     class MyEventHandler: EventHandler {
         typealias Event = MyEvent
 
-        func onEvent(_ event: DisruptorTests.MyEvent, sequence: UInt64, endOfBatch: Bool) {
+        func onEvent(_ event: DisruptorTests.MyEvent, sequence: Int64, endOfBatch: Bool) {
             print("\(event) / seq: \(sequence)")
         }
     }

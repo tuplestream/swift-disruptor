@@ -10,5 +10,5 @@ public protocol EventFactory {
 
 public protocol EventHandler {
     associatedtype Event
-    func onEvent(_ event: Event, sequence: UInt64, endOfBatch: Bool)
+    func onEvent(_ event: Event, sequence: Int64, endOfBatch: Bool)
 }

@@ -6,7 +6,7 @@
 import Foundation
 
 protocol WaitStrategy {
-    func waitFor(sequence: UInt64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> UInt64
+    func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64
     func signalAllWhenBlocking()
 }
 
@@ -23,7 +23,7 @@ final class SleepingWaitStrategy: WaitStrategy {
         self.sleepTimeNanoseconds = sleepTimeNanoseconds
     }
 
-    func waitFor(sequence: UInt64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> UInt64 {
+    func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64 {
         var availableSequence = dependentSequence.value
         var counter = retries
 

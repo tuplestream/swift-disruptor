@@ -7,13 +7,13 @@ import Atomics
 
 class Sequence: CustomStringConvertible {
 
-    private let counter: ManagedAtomic<UInt64>
+    private let counter: ManagedAtomic<Int64>
 
-    init(initialValue: UInt64 = 0) {
-        self.counter = ManagedAtomic<UInt64>(initialValue)
+    init(initialValue: Int64 = -1) {
+        self.counter = ManagedAtomic<Int64>(initialValue)
     }
 
-    var value: UInt64 {
+    var value: Int64 {
         get {
             return counter.load(ordering: .sequentiallyConsistent)
         }
@@ -23,17 +23,17 @@ class Sequence: CustomStringConvertible {
         }
     }
 
-    func incrementAndGet() -> UInt64 {
+    func incrementAndGet() -> Int64 {
         return addAndGet(1)
     }
 
-    func compareAndSet(expected: UInt64, newValue: UInt64) -> Bool {
+    func compareAndSet(expected: Int64, newValue: Int64) -> Bool {
         return counter.compareExchange(expected: expected, desired: newValue, ordering: .sequentiallyConsistent).exchanged
     }
 
-    func addAndGet(_ increment: UInt64) -> UInt64 {
-        var currentValue: UInt64
-        var newValue: UInt64 = 0
+    func addAndGet(_ increment: Int64) -> Int64 {
+        var currentValue: Int64
+        var newValue: Int64 = 0
         var exchanged = false
         while !exchanged {
             currentValue = value
@@ -47,5 +47,17 @@ class Sequence: CustomStringConvertible {
         get {
             return "\(counter.load(ordering: .relaxed))"
         }
+    }
+}
+
+final class SequenceGroup: Sequence {
+
+
+}
+
+class FixedSequenceGroup: Sequence {
+
+    init(sequences: [Sequence]) {
+        // TODO
     }
 }

@@ -7,6 +7,7 @@
 static inline int volatile_load_int(void *i) {
   return *(volatile int*)i;
 }
+
 static inline void volatile_store_int(void *i, int value) {
   *(volatile int*)i = value;
 }

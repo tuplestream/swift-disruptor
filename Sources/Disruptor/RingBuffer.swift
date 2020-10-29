@@ -7,20 +7,20 @@ import Foundation
 
 public final class RingBuffer<E>: Cursored, Sequenced {
 
-    public let bufferSize: Int
-    public private(set) var remainingCapacity: UInt64
+    public let bufferSize: Int32
+    public private(set) var remainingCapacity: Int64
 
-    private let indexMask: UInt64
+    private let indexMask: Int64
     private let entries: [E]
 
     init(_ factory: () -> E, sequencer: Sequencer) {
         precondition(sequencer.bufferSize > 1, "bufferSize must not be less than 1")
         precondition(sequencer.bufferSize.nonzeroBitCount == 1, "bufferSize must be a power of 2")
 
-        bufferSize = sequencer.bufferSize
+        bufferSize = Int32(sequencer.bufferSize)
         remainingCapacity = 0
-        self.indexMask = UInt64(bufferSize) - 1
-        self.entries = Array(repeating: factory(), count: bufferSize)
+        self.indexMask = Int64(bufferSize) - 1
+        self.entries = Array(repeating: factory(), count: Int(bufferSize))
     }
 
 //    public static func createMultiProducer(factory: () -> E, bufferSize: Int) -> RingBuffer<E> {
@@ -32,26 +32,26 @@ public final class RingBuffer<E>: Cursored, Sequenced {
         return true
     }
 
-    func next() -> UInt64 {
+    func next() -> Int64 {
         return 0
     }
 
-    func next(_ n: Int) -> UInt64 {
+    func next(_ n: Int) -> Int64 {
         return 0
     }
 
-    func publish(_ sequence: UInt64) {
+    func publish(_ sequence: Int64) {
 
     }
 
-    func publish(low: UInt64, high: UInt64) {
+    func publish(low: Int64, high: Int64) {
 
     }
 
 
 //    private let sequencer: Sequencer
 
-    var cursor: UInt64 {
+    var cursor: Int64 {
         get {
 //            return sequencer.cursor
             return 0
