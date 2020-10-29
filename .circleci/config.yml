@@ -1,0 +1,41 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: tuplestream/swift-env:latest
+    steps:
+      - checkout
+      - run: swift test --verbose
+  validate:
+    docker:
+      - image: m0wfo/tailor:0.12.0
+    steps:
+      - checkout
+      - run: tailor --format=json ~/project
+  bump_version:
+    docker:
+      - image: tuplestream/bumpversion:latest
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "d1:e4:17:3c:19:80:78:f0:31:43:9c:cf:53:7d:e4:c9"
+      - checkout
+      - run:
+          name: run bumpversion and push
+          command: bump
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
+      - validate
+      - bump_version:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - build
+            - validate
