@@ -6,33 +6,46 @@
 import XCTest
 @testable import Disruptor
 
+class StubEvent: CustomStringConvertible {
+    var i: Int
+
+    init(_ i: Int = 0) {
+        self.i = i
+    }
+
+    var description: String {
+        get {
+            return "value: \(i)"
+        }
+    }
+}
+
+class StubEventFactory: EventFactory {
+    typealias Event = StubEvent
+
+    func newInstance() -> StubEvent {
+        return StubEvent()
+    }
+}
+
+class StubEventTranslator: EventTranslator {
+    typealias Event = StubEvent
+    typealias Input = Int
+
+    func translateTo(_ event: StubEvent, sequence: Int64, input: Int) {
+        event.i = input
+    }
+}
+
+class StubEventHandler: EventHandler {
+    typealias Event = StubEvent
+
+    func onEvent(_ event: StubEvent, sequence: Int64, endOfBatch: Bool) {
+        print("\(event) / seq: \(sequence)")
+    }
+}
+
 final class DisruptorTests: XCTestCase {
-
-    class MyEvent: CustomStringConvertible {
-        var value: Int = 0
-
-        var description: String {
-            get {
-                return "value: \(value)"
-            }
-        }
-    }
-
-    class MyEventFactory: EventFactory {
-        typealias Event = MyEvent
-
-        func newInstance() -> DisruptorTests.MyEvent {
-            return MyEvent()
-        }
-    }
-
-    class MyEventHandler: EventHandler {
-        typealias Event = MyEvent
-
-        func onEvent(_ event: DisruptorTests.MyEvent, sequence: Int64, endOfBatch: Bool) {
-            print("\(event) / seq: \(sequence)")
-        }
-    }
 
     func overallTest() {
 

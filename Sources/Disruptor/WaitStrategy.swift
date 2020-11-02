@@ -43,12 +43,12 @@ final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
             pthread_mutex_unlock(lock)
         }
 
-        var availableSequence = dependentSequence.value
-        while availableSequence < sequence {
+        var availableSequence: Int64
+        repeat {
             try barrier.checkAlert()
             // TODO- figure out how to introduce __mm_pause or similar to mitigate cpu load from spinning here
             availableSequence = dependentSequence.value
-        }
+        } while availableSequence < sequence
         return availableSequence
     }
 

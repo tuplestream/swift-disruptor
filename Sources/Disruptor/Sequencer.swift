@@ -31,7 +31,7 @@ protocol Sequencer: Sequenced, Cursored {
 
 final class MultiProducerSequencer: Sequencer {
 
-    private static let initialCursorValue: Int64 = -1
+    static let initialCursorValue: Int64 = -1
     private static let scale = MemoryLayout<Int>.size
 
     private let internalCursor: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)

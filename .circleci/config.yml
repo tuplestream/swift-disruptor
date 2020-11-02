@@ -6,7 +6,7 @@ jobs:
       - image: tuplestream/swift-env:latest
     steps:
       - checkout
-      - run: swift test --verbose
+      - run: swift test -Xcc -mcx16 -Xswiftc -DENABLE_DOUBLEWIDE_ATOMICS --verbose
   validate:
     docker:
       - image: m0wfo/tailor:0.12.0
