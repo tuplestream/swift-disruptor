@@ -36,7 +36,7 @@ public final class RingBuffer<E>: Cursored, Sequenced {
         return 0
     }
 
-    func next(_ n: Int) -> Int64 {
+    func next(_ n: Int32) -> Int64 {
         return 0
     }
 

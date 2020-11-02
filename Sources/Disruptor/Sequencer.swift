@@ -12,7 +12,7 @@ protocol Sequenced {
     var remainingCapacity: Int64 { get }
     func hasAvailableCapacity(required: Int) -> Bool
     func next() -> Int64
-    func next(_ n: Int) -> Int64
+    func next(_ n: Int32) -> Int64
     func publish(_ sequence: Int64)
     func publish(low: Int64, high: Int64)
 }
@@ -27,17 +27,6 @@ protocol Sequencer: Sequenced, Cursored {
     func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64
     func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier
     func addGatingSequences(gatingSequences: [Sequence])
-}
-
-final class SequenceUtils {
-
-    static func getMinimumSequence(sequences: [Sequence], minimum: Int64) -> Int64 {
-        var currentMin = minimum
-        for sequence in sequences {
-            currentMin = min(sequence.value, currentMin)
-        }
-        return currentMin
-    }
 }
 
 final class MultiProducerSequencer: Sequencer {
@@ -122,15 +111,15 @@ final class MultiProducerSequencer: Sequencer {
     }
 
     func addGatingSequences(gatingSequences: [Sequence]) {
-
+        
     }
 
     func next() -> Int64 {
         return next(1)
     }
 
-    func next(_ n: Int) -> Int64 {
-        precondition(n > 0 && n < bufferSize, "n must be > 0 and < bufferSize")
+    func next(_ n: Int32) -> Int64 {
+        precondition(n > 0 && n <= bufferSize, "n must be > 0 and <= bufferSize")
 
         var current: Int64 = internalCursor.value
         var next: Int64 = current + Int64(n)

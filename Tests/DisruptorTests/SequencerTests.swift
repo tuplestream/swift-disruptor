@@ -27,7 +27,7 @@ final class SequencerTests: XCTestCase {
     var gatingSequence: Sequence!
 
     override func setUp() {
-        sequencer = MultiProducerSequencer(bufferSize: SequencerTests.bufferSize, waitStrategy: SleepingWaitStrategy())
+        sequencer = MultiProducerSequencer(bufferSize: SequencerTests.bufferSize, waitStrategy: BlockingWaitStrategy())
         gatingSequence = Sequence()
     }
 
@@ -40,6 +40,28 @@ final class SequencerTests: XCTestCase {
     }
 
     func testShouldIndicateHasAvailableCapacity() {
+        sequencer.addGatingSequences(gatingSequences: [gatingSequence])
+
+        XCTAssertTrue(sequencer.hasAvailableCapacity(required: 1))
+        XCTAssertTrue(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize)))
+        XCTAssertFalse(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize) + 1))
+
+        sequencer.publish(sequencer.next())
+
+        XCTAssertTrue(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize) - 1))
+        XCTAssertFalse(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize)))
+    }
+
+    func testShouldIndicateNoAvailableCapacity() {
+        sequencer.addGatingSequences(gatingSequences: [gatingSequence])
+
+        let sequence = sequencer.next(SequencerTests.bufferSize)
+        sequencer.publish(low: sequence - (Int64(SequencerTests.bufferSize) - 1), high: sequence)
+
+        XCTAssertFalse(sequencer.hasAvailableCapacity(required: 1))
+    }
+
+    func testShouldHoldUpPublisherWhenBufferIsFull() {
         
     }
 
@@ -104,4 +126,22 @@ final class SequencerTests: XCTestCase {
         XCTAssertEqual(sequencer.next(), sequence + 1)
     }
 
+}
+
+class MultiProducerSequencerTests: XCTestCase {
+
+    func testShouldOnlyAllowMessagesToBeAvailableIfSpecificallyPublished() {
+        let publisher = MultiProducerSequencer(bufferSize: 1024, waitStrategy: BlockingWaitStrategy())
+
+        publisher.publish(3)
+        publisher.publish(5)
+
+        XCTAssertFalse(publisher.isAvailable(sequence: 0))
+        XCTAssertFalse(publisher.isAvailable(sequence: 1))
+        XCTAssertFalse(publisher.isAvailable(sequence: 2))
+        XCTAssertTrue(publisher.isAvailable(sequence: 3))
+        XCTAssertFalse(publisher.isAvailable(sequence: 4))
+        XCTAssertTrue(publisher.isAvailable(sequence: 5))
+        XCTAssertFalse(publisher.isAvailable(sequence: 6))
+    }
 }

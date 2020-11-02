@@ -4,6 +4,22 @@
  SPDX-License-Identifier: Apache-2.0
 */
 import Atomics
+import Foundation
+
+final class SequenceUtils {
+
+    static func getMinimumSequence(sequences: [Sequence]) -> Int64 {
+        return getMinimumSequence(sequences: sequences, minimum: Int64.max)
+    }
+
+    static func getMinimumSequence(sequences: [Sequence], minimum: Int64) -> Int64 {
+        var currentMin = minimum
+        for sequence in sequences {
+            currentMin = min(sequence.value, currentMin)
+        }
+        return currentMin
+    }
+}
 
 class Sequence: CustomStringConvertible {
 
@@ -50,9 +66,86 @@ class Sequence: CustomStringConvertible {
     }
 }
 
+fileprivate final class SequenceHolder: AtomicReference {
+
+    private(set) var sequences: [Sequence]
+
+    init(_ sequences: [Sequence]) {
+        self.sequences = sequences
+    }
+
+    var sequenceCount: Int {
+        get {
+            return sequences.count
+        }
+    }
+}
+
 final class SequenceGroup: Sequence {
 
+    private let sequences: ManagedAtomic<SequenceHolder>
 
+    init(sequences: [Sequence] = []) {
+        self.sequences = ManagedAtomic<SequenceHolder>(SequenceHolder(sequences))
+    }
+
+    var size: Int {
+        get {
+            return sequenceArray.count
+        }
+    }
+
+    private var sequenceArray: [Sequence] {
+        get {
+            return sequences.load(ordering: .sequentiallyConsistent).sequences
+        }
+    }
+
+    override var value: Int64 {
+        get {
+            return SequenceUtils.getMinimumSequence(sequences: sequenceArray)
+        }
+        set(newValue) {
+            for sequence in sequenceArray {
+                sequence.value = newValue
+            }
+        }
+    }
+
+    // Add a Sequence into this aggregate. This should only be used during initialisation.
+    // Use addWhileRunning() after if necessary.
+    func add(_ sequence: Sequence) {
+        var current: SequenceHolder
+        var updated: SequenceHolder
+
+        repeat {
+            current = sequences.load(ordering: .sequentiallyConsistent)
+            var updatedList = current.sequences
+            updatedList.append(sequence)
+            updated = SequenceHolder(updatedList)
+        } while !sequences.compareExchange(expected: current, desired: updated, ordering: .sequentiallyConsistent).exchanged
+    }
+
+    func remove(_ sequence: Sequence) -> Bool {
+        var current: SequenceHolder
+        var updated: SequenceHolder
+        var didRemove = false
+
+        repeat {
+            current = sequences.load(ordering: .sequentiallyConsistent)
+            var updatedList = current.sequences
+            updatedList.removeAll { seq in
+                if seq === sequence {
+                    didRemove = true
+                    return true
+                }
+                return false
+            }
+            updated = SequenceHolder(updatedList)
+        } while !sequences.compareExchange(expected: current, desired: updated, ordering: .sequentiallyConsistent).exchanged
+
+        return didRemove
+    }
 }
 
 class FixedSequenceGroup: Sequence {
