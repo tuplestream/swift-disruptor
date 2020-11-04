@@ -91,3 +91,18 @@ final class SequenceTests: XCTestCase {
         // TODO
     }
 }
+
+class FixedSequenceGroupTests: XCTestCase {
+
+    func testShouldReturnMinimumOf2Sequences() {
+        let s1 = Sequence(initialValue: 34)
+        let s2 = Sequence(initialValue: 47)
+        let group = FixedSequenceGroup([s1, s2])
+
+        XCTAssertEqual(34, group.value)
+        s1.value = 35
+        XCTAssertEqual(35, group.value)
+        s1.value = 48
+        XCTAssertEqual(47, group.value)
+    }
+}

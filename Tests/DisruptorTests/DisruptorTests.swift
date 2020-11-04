@@ -5,6 +5,7 @@
 */
 import XCTest
 @testable import Disruptor
+import Atomics
 
 class StubEvent: CustomStringConvertible {
     var i: Int
@@ -32,7 +33,7 @@ class StubEventTranslator: EventTranslator {
     typealias Event = StubEvent
     typealias Input = Int
 
-    func translateTo(_ event: StubEvent, sequence: Int64, input: Int) {
+    func translateTo(_ event: inout StubEvent, sequence: Int64, input: Int) {
         event.i = input
     }
 }
@@ -43,6 +44,36 @@ class StubEventHandler: EventHandler {
     func onEvent(_ event: StubEvent, sequence: Int64, endOfBatch: Bool) {
         print("\(event) / seq: \(sequence)")
     }
+}
+
+class DummyEventProcessor: EventProcessor {
+
+    public private(set) var sequence: Sequence
+    private let running = ManagedAtomic<Bool>(false)
+
+    init(_ sequence: Sequence = Sequence(initialValue: -1)) {
+        self.sequence = sequence
+    }
+
+    func run() {
+        precondition(running.compareExchange(expected: false, desired: true, ordering: .acquiringAndReleasing).exchanged,
+                     "already running")
+    }
+
+    func setSequence(_ value: Int64) {
+        sequence.value = value
+    }
+
+    func halt() {
+        running.store(false, ordering: .relaxed)
+    }
+
+    var isRunning: Bool {
+        get {
+            return running.load(ordering: .relaxed)
+        }
+    }
+
 }
 
 final class DisruptorTests: XCTestCase {

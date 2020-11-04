@@ -6,7 +6,6 @@
 import XCTest
 @testable import Disruptor
 @testable import _Volatile
-import Atomics
 
 final class VolatileTests: XCTestCase {
 
@@ -19,5 +18,4 @@ final class VolatileTests: XCTestCase {
         let j = volatile_load_int(UnsafeMutableRawPointer(pointerToSecondInt))
         XCTAssertEqual(1337, j)
     }
-
 }

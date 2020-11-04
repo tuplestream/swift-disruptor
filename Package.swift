@@ -21,6 +21,9 @@ let package = Package(
                            .product(name: "Atomics", package: "swift-atomics")]),
         .testTarget(
             name: "DisruptorTests",
-            dependencies: ["Disruptor"]),
+            dependencies: [
+                .target(name: "Disruptor"),
+                .product(name: "Atomics", package: "swift-atomics")
+            ]),
     ]
 )

@@ -5,13 +5,14 @@
 */
 import Foundation
 
-public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced where F.Event == E {
+public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSink where F.Event == E {
     public typealias Event = E
 
     public let bufferSize: Int32
     public private(set) var remainingCapacity: Int64
 
     private let indexMask: Int64
+    // TODO pad entry list like the Java impl (https://github.com/tuplestream/swift-disruptor/issues/3)
     private let entries: [E]
     private let sequencer: Sequencer
 
@@ -22,7 +23,11 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced where F.E
         bufferSize = Int32(sequencer.bufferSize)
         remainingCapacity = 0
         self.indexMask = Int64(bufferSize) - 1
-        self.entries = Array(repeating: factory.newInstance(), count: Int(bufferSize))
+        var tmpArray: [E] = Array()
+        for _ in 0..<bufferSize {
+            tmpArray.append(factory.newInstance())
+        }
+        self.entries = tmpArray
         self.sequencer = sequencer
     }
 
@@ -31,39 +36,50 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced where F.E
         return RingBuffer<E,F>(factory, sequencer: sequencer)
     }
 
-    func hasAvailableCapacity(required: Int) -> Bool {
-        return true
+    func newBarrier(sequencesToTrack: Sequence...) -> SequenceBarrier {
+        return sequencer.newBarrier(sequencesToTrack: sequencesToTrack)
     }
 
-    func next() -> Int64 {
-        return 0
+    func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier {
+        return sequencer.newBarrier(sequencesToTrack: sequencesToTrack)
     }
 
-    func next(_ n: Int32) -> Int64 {
-        return 0
+    func addGatingSequences(sequences: Sequence...) {
+        sequencer.addGatingSequences(sequences: sequences)
     }
 
-//    func get(sequence: Int64) -> E {
-//        
-//    }
-
-    func publish(_ sequence: Int64) {
-
+    public func hasAvailableCapacity(required: Int) -> Bool {
+        return sequencer.hasAvailableCapacity(required: required)
     }
 
-    func publish(low: Int64, high: Int64) {
-
+    public func next() -> Int64 {
+        return sequencer.next()
     }
 
-//    public func publishEvent<T: EventTranslator>(translator: T, input: T.Input) where T.Event == E {
-//        let sequence = sequencer.next()
-////        entries.withUnsafeBytes { bp in
-////            bp.baseAddress?.advanced(by: <#T##Int#>)
-////        }
-////        translator.translateTo(, sequence: sequence, input: input)
-//    }
+    public func next(_ n: Int32) -> Int64 {
+        return sequencer.next(n)
+    }
 
-    var cursor: Int64 {
+    public func get(sequence: Int64) -> E {
+        return entries[Int(sequence & indexMask)]
+    }
+
+    public func publish(_ sequence: Int64) {
+        sequencer.publish(sequence)
+    }
+
+    public func publish(low: Int64, high: Int64) {
+        sequencer.publish(low: low, high: high)
+    }
+
+    public func publishEvent<T: EventTranslator>(translator: T, input: T.Input) where T.Event == E {
+        let sequence = sequencer.next()
+        var e = get(sequence: sequence)
+        translator.translateTo(&e, sequence: sequence, input: input)
+        sequencer.publish(sequence)
+    }
+
+    public var cursor: Int64 {
         get {
             return sequencer.cursor
         }

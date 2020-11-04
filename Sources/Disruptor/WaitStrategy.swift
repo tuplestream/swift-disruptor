@@ -5,7 +5,7 @@
 */
 import Foundation
 
-protocol WaitStrategy {
+public protocol WaitStrategy {
     func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64
     func signalAllWhenBlocking()
 }

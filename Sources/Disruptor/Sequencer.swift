@@ -7,7 +7,7 @@ import Atomics
 import Foundation
 import _Volatile
 
-protocol Sequenced {
+public protocol Sequenced {
     var bufferSize: Int32 { get }
     var remainingCapacity: Int64 { get }
     func hasAvailableCapacity(required: Int) -> Bool
@@ -17,40 +17,35 @@ protocol Sequenced {
     func publish(low: Int64, high: Int64)
 }
 
-protocol Cursored {
+public protocol Cursored {
     var cursor: Int64 { get }
 }
 
-protocol Sequencer: Sequenced, Cursored {
+public protocol Sequencer: Sequenced, Cursored {
     func claim(sequence: Int64)
     func isAvailable(sequence: Int64) -> Bool
     func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64
     func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier
-    func addGatingSequences(gatingSequences: [Sequence])
+    func addGatingSequences(sequences: [Sequence])
 }
 
-final class MultiProducerSequencer: Sequencer {
+protocol SequencerImpl: Sequencer, CustomStringConvertible {
 
-    static let initialCursorValue: Int64 = -1
-    private static let scale = MemoryLayout<Int>.size
+    var internalCursor: Sequence { get }
+    var waitStrategy: WaitStrategy { get }
 
-    private let internalCursor: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
-    private let gatingSequenceCache: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
-    private var availableBuffer: [Int32]
-    private let indexMask: Int32
-    private let indexShift: Int32
-    private let waitStrategy: WaitStrategy
-    private var gatingSequences: [Sequence]
+    func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier
+}
 
-    public private(set) var bufferSize: Int32
+struct SequenceNode {
+    let sequence: Sequence
+    let next: UnsafeMutablePointer<SequenceNode>?
+}
 
-    public init(bufferSize: Int32, waitStrategy: WaitStrategy) {
-        self.bufferSize = bufferSize
-        self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
-        self.indexMask = bufferSize - 1
-        self.indexShift = Int32(log2(Double(bufferSize)))
-        self.waitStrategy = waitStrategy
-        self.gatingSequences = [Sequence()]
+extension SequencerImpl {
+
+    func next() -> Int64 {
+        return next(1)
     }
 
     var cursor: Int64 {
@@ -59,9 +54,75 @@ final class MultiProducerSequencer: Sequencer {
         }
     }
 
+    var description: String {
+        get {
+            "Sequencer(cursorValue=\(cursor))"
+        }
+    }
+
+    func newBarrier(sequencesToTrack: [Sequence] = []) -> SequenceBarrier {
+        return ProcessingSequenceBarrier(sequencer: self, waitStrategy: waitStrategy, cursorSequence: internalCursor, dependentSequences: sequencesToTrack)
+    }
+
+    internal func sleepNanos() {
+        Thread.sleep(forTimeInterval: 0.0000000001)
+    }
+}
+
+final class MultiProducerSequencer: SequencerImpl {
+
+    static let initialCursorValue: Int64 = -1
+
+    internal private(set) var internalCursor: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
+    private let gatingSequenceCache: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
+    private var availableBuffer: [Int32]
+    private let indexMask: Int32
+    private let indexShift: Int32
+    private let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>
+    internal let waitStrategy: WaitStrategy
+
+    public private(set) var bufferSize: Int32
+
+    public init(bufferSize: Int32, waitStrategy: WaitStrategy) {
+        let headNodePtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
+        headNodePtr.initialize(to: nil)
+        self.gatingSequences = ManagedAtomic(headNodePtr)
+        self.bufferSize = bufferSize
+        self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
+        self.indexMask = bufferSize - 1
+        self.indexShift = Int32(log2(Double(bufferSize)))
+        self.waitStrategy = waitStrategy
+    }
+
+    func addGatingSequences(sequences: [Sequence]) {
+        if sequences.isEmpty {
+            return
+        }
+
+        // TODO just added 1st element for unit testing
+
+        var result: (exchanged: Bool, original: UnsafeMutablePointer<SequenceNode?>)
+
+        repeat {
+            let currentHead = gatingSequences.load(ordering: .sequentiallyConsistent)
+            let newHead: SequenceNode
+            if let existing = currentHead.pointee {
+                let nextPtr = UnsafeMutablePointer<SequenceNode>.allocate(capacity: 1)
+                nextPtr.initialize(to: existing)
+                newHead = SequenceNode(sequence: sequences[0], next: nextPtr)
+            } else {
+                newHead = SequenceNode(sequence: sequences[0], next: nil)
+            }
+            let newHeadPtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
+            newHeadPtr.initialize(to: newHead)
+
+            result = gatingSequences.compareExchange(expected: currentHead, desired: newHeadPtr, ordering: .sequentiallyConsistent)
+        } while !result.exchanged
+    }
+
     var remainingCapacity: Int64 {
         get {
-            let consumed = SequenceUtils.getMinimumSequence(sequences: gatingSequences, minimum: cursor)
+            let consumed = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: cursor)
             return Int64(bufferSize) - (cursor - consumed)
         }
     }
@@ -89,33 +150,21 @@ final class MultiProducerSequencer: Sequencer {
     }
 
     public func hasAvailableCapacity(required: Int) -> Bool {
-        return hasAvailableCapacity(gatingSequences: self.gatingSequences, required: required, cursorValue: internalCursor.value)
+        return hasAvailableCapacity(required: required, cursorValue: internalCursor.value)
     }
 
-    private func hasAvailableCapacity(gatingSequences: [Sequence], required: Int, cursorValue: Int64) -> Bool {
+    private func hasAvailableCapacity(required: Int, cursorValue: Int64) -> Bool {
         let wrapPoint = (cursorValue + Int64(required)) - Int64(bufferSize)
         let cachedGatingSequence = gatingSequenceCache.value
 
         if wrapPoint > cachedGatingSequence || cachedGatingSequence > cursorValue {
-            let minSequence = SequenceUtils.getMinimumSequence(sequences: gatingSequences, minimum: cursorValue)
+            let minSequence = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: cursorValue)
 
             if wrapPoint > minSequence {
                 return false
             }
         }
         return true
-    }
-
-    func newBarrier(sequencesToTrack: [Sequence] = []) -> SequenceBarrier {
-        return ProcessingSequenceBarrier(sequencer: self, waitStrategy: waitStrategy, cursorSequence: internalCursor, dependentSequences: sequencesToTrack)
-    }
-
-    func addGatingSequences(gatingSequences: [Sequence]) {
-        
-    }
-
-    func next() -> Int64 {
-        return next(1)
     }
 
     func next(_ n: Int32) -> Int64 {
@@ -132,10 +181,10 @@ final class MultiProducerSequencer: Sequencer {
             let cachedGatingSequence = gatingSequenceCache.value
 
             if wrapPoint > cachedGatingSequence || cachedGatingSequence > current {
-                let gatingSequence = SequenceUtils.getMinimumSequence(sequences: gatingSequences, minimum: current)
+                let gatingSequence = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: current)
 
                 if wrapPoint > gatingSequence {
-                    Thread.sleep(forTimeInterval: 0.0000000001)
+                    sleepNanos()
                     continue
                 }
 
@@ -176,5 +225,106 @@ final class MultiProducerSequencer: Sequencer {
 
     private func calculateAvailabilityFlag(_ sequence: Int64) -> Int32 {
         return Int32(sequence).bigEndian >> indexShift
+    }
+}
+
+final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
+
+    private var nextValue: Int64 = -1
+    private var cachedValue: Int64 = -1
+
+    internal let waitStrategy: WaitStrategy
+    internal let internalCursor: Sequence
+
+    private let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>
+
+    let bufferSize: Int32
+
+    init(bufferSize: Int32, waitStrategy: WaitStrategy) {
+        self.bufferSize = bufferSize
+        self.waitStrategy = waitStrategy
+        self.internalCursor = Sequence(initialValue: -1)
+        let rawPtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
+        rawPtr.initialize(to: nil)
+        self.gatingSequences = ManagedAtomic(rawPtr)
+    }
+
+    func addGatingSequences(sequences: [Sequence]) {
+
+    }
+
+    func claim(sequence: Int64) {
+        self.nextValue = sequence
+    }
+
+    func isAvailable(sequence: Int64) -> Bool {
+        return sequence <= internalCursor.value
+    }
+
+    func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64 {
+        return availableSequence
+    }
+
+    var remainingCapacity: Int64 {
+        get {
+            let nxt = self.nextValue
+            let consumed = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: nxt)
+            let produced = nxt
+            return Int64(bufferSize) - (produced - consumed)
+        }
+    }
+
+    func hasAvailableCapacity(required: Int) -> Bool {
+        let nxt = self.nextValue
+        let wrapPoint = (nxt + Int64(required)) - Int64(bufferSize)
+        let cachedGatingSequence = self.cachedValue
+
+        if wrapPoint > cachedGatingSequence || cachedGatingSequence > nxt {
+            // if doStore {
+            //     internalCursor.setVolatile(nxt)
+            // }
+            let minSequence = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: nxt)
+            self.cachedValue = minSequence
+
+            if wrapPoint > minSequence {
+                return false
+            }
+        }
+        return true
+    }
+
+    func next(_ n: Int32) -> Int64 {
+        precondition(n > 0 && n <= bufferSize, "n must be > 0 and <= bufferSize")
+
+        let nextValue = self.nextValue
+
+        let nextSequence = nextValue + Int64(n)
+        let wrapPoint = nextSequence - Int64(bufferSize)
+        let cachedGatingSequence = self.cachedValue
+
+        if wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue {
+            internalCursor.setVolatile(nextValue)
+
+            var minSequence: Int64
+            repeat {
+                sleepNanos()
+                minSequence = SequenceUtils.getMinimumSequence(sequences: [], minimum: nextValue)
+            } while wrapPoint > minSequence
+
+            self.cachedValue = minSequence
+        }
+
+        self.nextValue = nextSequence
+
+        return nextSequence
+    }
+
+    func publish(_ sequence: Int64) {
+        internalCursor.value = sequence
+        waitStrategy.signalAllWhenBlocking()
+    }
+
+    func publish(low: Int64, high: Int64) {
+        publish(high)
     }
 }

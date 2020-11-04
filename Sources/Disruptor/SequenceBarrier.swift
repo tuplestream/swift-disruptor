@@ -5,7 +5,7 @@
 */
 import _Volatile
 
-protocol SequenceBarrier {
+public protocol SequenceBarrier {
     func waitFor(sequence: Int64) throws -> Int64
     var cursor: Int64 { get }
     func alert()
@@ -37,7 +37,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
         if dependentSequences.isEmpty {
             self.dependentSequence = cursorSequence
         } else {
-            self.dependentSequence = FixedSequenceGroup(sequences: dependentSequences)
+            self.dependentSequence = FixedSequenceGroup(dependentSequences)
         }
     }
 
@@ -46,6 +46,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
     }
 
     func waitFor(sequence: Int64) throws -> Int64 {
+        try checkAlert()
         let availableSequence = try waitStrategy.waitFor(sequence: sequence, cursor: cursorSequence, dependentSequence: dependentSequence, barrier: self)
         if availableSequence < sequence {
             return availableSequence

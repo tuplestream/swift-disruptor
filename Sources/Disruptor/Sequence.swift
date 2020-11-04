@@ -5,11 +5,25 @@
 */
 import Atomics
 import Foundation
+import _Volatile
 
 final class SequenceUtils {
 
     static func getMinimumSequence(sequences: [Sequence]) -> Int64 {
         return getMinimumSequence(sequences: sequences, minimum: Int64.max)
+    }
+
+    static func getMinimumSequence(holder: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>, minimum: Int64) -> Int64 {
+        var currentMin = minimum
+        if var head = holder.load(ordering: .relaxed).pointee {
+            repeat {
+                currentMin = min(head.sequence.value, currentMin)
+                if let next = head.next {
+                    head = next.pointee
+                }
+            } while head.next != nil
+        }
+        return currentMin
     }
 
     static func getMinimumSequence(sequences: [Sequence], minimum: Int64) -> Int64 {
@@ -19,9 +33,15 @@ final class SequenceUtils {
         }
         return currentMin
     }
+
+    static func getSequencesFor(processors: [EventProcessor]) -> [Sequence] {
+        return processors.map { ep in
+            return ep.sequence
+        }
+    }
 }
 
-class Sequence: CustomStringConvertible {
+public class Sequence: CustomStringConvertible {
 
     private let counter: ManagedAtomic<Int64>
 
@@ -47,6 +67,10 @@ class Sequence: CustomStringConvertible {
         return counter.compareExchange(expected: expected, desired: newValue, ordering: .sequentiallyConsistent).exchanged
     }
 
+    internal func setVolatile(_ n: Int64) {
+        counter.store(n, ordering: .relaxed)
+    }
+
     func addAndGet(_ increment: Int64) -> Int64 {
         var currentValue: Int64
         var newValue: Int64 = 0
@@ -59,16 +83,16 @@ class Sequence: CustomStringConvertible {
         return newValue
     }
 
-    var description: String {
+    public var description: String {
         get {
-            return "\(counter.load(ordering: .relaxed))"
+            return "Sequence(value=\(value))"
         }
     }
 }
 
-fileprivate final class SequenceHolder: AtomicReference {
+final class SequenceHolder: AtomicReference {
 
-    private(set) var sequences: [Sequence]
+    let sequences: [Sequence]
 
     init(_ sequences: [Sequence]) {
         self.sequences = sequences
@@ -150,7 +174,18 @@ final class SequenceGroup: Sequence {
 
 class FixedSequenceGroup: Sequence {
 
-    init(sequences: [Sequence]) {
-        // TODO
+    private let sequences: [Sequence]
+
+    init(_ sequences: [Sequence]) {
+        self.sequences = sequences
+    }
+
+    override var value: Int64 {
+        get {
+            return SequenceUtils.getMinimumSequence(sequences: sequences)
+        }
+        set(newValue) {
+            precondition(false, "set not supported on FixedSequenceGroup")
+        }
     }
 }
