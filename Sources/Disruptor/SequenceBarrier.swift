@@ -8,6 +8,7 @@ import _Volatile
 public protocol SequenceBarrier {
     func waitFor(sequence: Int64) throws -> Int64
     var cursor: Int64 { get }
+    var isAlerted: Bool { get }
     func alert()
     func clearAlert()
     func checkAlert() throws
@@ -55,6 +56,12 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
         return sequencer.getHighestPublishedSequence(lowerBound: sequence, availableSequence: availableSequence)
     }
 
+    var isAlerted: Bool {
+        get {
+            return volatile_load_int(UnsafeMutableRawPointer(alerted)) == 1
+        }
+    }
+
     func alert() {
         volatile_store_int(UnsafeMutableRawPointer(alerted), 1)
     }
@@ -64,7 +71,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
     }
 
     func checkAlert() throws {
-        if volatile_load_int(UnsafeMutableRawPointer(alerted)) == 1 {
+        if isAlerted {
             throw AlertError()
         }
     }

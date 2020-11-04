@@ -11,7 +11,8 @@ let package = Package(
             targets: ["Disruptor"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git",from: "0.0.1")
+        .package(url: "https://github.com/apple/swift-atomics.git",from: "0.0.1"),
+        .package(name: "Concurrency", url: "https://github.com/uber/swift-concurrency.git", from: "0.7.0"),
     ],
     targets: [
         .target(name: "_Volatile", dependencies: []),
@@ -23,7 +24,8 @@ let package = Package(
             name: "DisruptorTests",
             dependencies: [
                 .target(name: "Disruptor"),
-                .product(name: "Atomics", package: "swift-atomics")
+                .product(name: "Atomics", package: "swift-atomics"),
+                .product(name: "Concurrency", package: "Concurrency")
             ]),
     ]
 )

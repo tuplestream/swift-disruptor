@@ -9,6 +9,15 @@
           "revision": "26e346cd64f6b92d4089e7fafe2f8e82f60ddb8c",
           "version": "0.0.2"
         }
+      },
+      {
+        "package": "Concurrency",
+        "repositoryURL": "https://github.com/uber/swift-concurrency.git",
+        "state": {
+          "branch": null,
+          "revision": "e29e42c41c47c82ec32d3a2b2695719c32415ca9",
+          "version": "0.7.1"
+        }
       }
     ]
   },

@@ -5,6 +5,7 @@
 */
 import XCTest
 @testable import Disruptor
+import Concurrency
 
 class SequenceBarrierTests: XCTestCase {
 
@@ -67,9 +68,71 @@ class SequenceBarrierTests: XCTestCase {
     func testShouldInterruptDuringBusySpin() {
         let expectedNumberMessages = 10
         fillRingBuffer(expectedNumberMessages)
+
+        let barrier = CountDownLatch(count: 3)
+        let sequence1 = CountDownLatchSequence(initialValue: 8, barrier)
+        let sequence2 = CountDownLatchSequence(initialValue: 8, barrier)
+        let sequence3 = CountDownLatchSequence(initialValue: 8, barrier)
+
+        let sequenceBarrier = ringBuffer.newBarrier(sequencesToTrack: sequence1, sequence2, sequence3)
+
+        var alerted = false
+        let work = DispatchWorkItem {
+            do {
+                let _ = try sequenceBarrier.waitFor(sequence: Int64(expectedNumberMessages) - 1)
+            } catch is AlertError {
+                alerted = true
+            } catch {
+                // don't care
+            }
+        }
+
+        DispatchQueue(label: "testShouldInterruptDuringBusySpin").async(execute: work)
+        barrier.await(timeout: 3)
+        sequenceBarrier.alert()
+        work.wait()
+
+        XCTAssertTrue(alerted)
     }
 
+    func testShouldWaitForWorkCompleteWhereCompleteWorkThresholdIsBehind() {
+        let expectedNumberMessages = 10
+        fillRingBuffer(expectedNumberMessages)
 
+        var workers = Array<DummyEventProcessor>()
+        for _ in 0..<3 {
+            let ep = DummyEventProcessor()
+            ep.setSequence(Int64(expectedNumberMessages) - 1)
+            workers.append(ep)
+        }
+
+        let sequenceBarrier = ringBuffer.newBarrier(sequencesToTrack: SequenceUtils.getSequencesFor(processors: workers))
+
+        let work = DispatchWorkItem {
+            for worker in workers {
+                worker.setSequence(worker.sequence.value + 1)
+            }
+        }
+
+        DispatchQueue(label: "testShouldWaitForWorkCompleteWhereCompleteWorkThresholdIsBehind").sync(execute: work)
+
+        let expectedWorkSequence = Int64(expectedNumberMessages) - 1
+        let completedWorkSequence = try! sequenceBarrier.waitFor(sequence: expectedWorkSequence)
+
+        XCTAssertGreaterThanOrEqual(completedWorkSequence, expectedWorkSequence)
+    }
+
+    func testShouldSetAndClearAlertStatus() {
+        let sequenceBarrier = ringBuffer.newBarrier(sequencesToTrack: [])
+
+        XCTAssertFalse(sequenceBarrier.isAlerted)
+
+        sequenceBarrier.alert()
+        XCTAssertTrue(sequenceBarrier.isAlerted)
+
+        sequenceBarrier.clearAlert()
+        XCTAssertFalse(sequenceBarrier.isAlerted)
+    }
 
     private func fillRingBuffer(_ expectedNumberMessages: Int) {
         for i in 0..<expectedNumberMessages {
@@ -77,6 +140,26 @@ class SequenceBarrierTests: XCTestCase {
             let event = ringBuffer.get(sequence: sequence)
             event.i = i
             ringBuffer.publish(sequence)
+        }
+    }
+}
+
+fileprivate final class CountDownLatchSequence: Sequence {
+
+    private let barrier: CountDownLatch
+
+    init(initialValue: Int64, _ barrier: CountDownLatch) {
+        self.barrier = barrier
+        super.init(initialValue: initialValue)
+    }
+
+    override var value: Int64 {
+        get {
+            barrier.countDown()
+            return super.value
+        }
+        set(newValue) {
+            super.value = newValue
         }
     }
 }

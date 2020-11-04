@@ -10,7 +10,7 @@ public protocol WaitStrategy {
     func signalAllWhenBlocking()
 }
 
-final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
+public final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
 
     private let lock: UnsafeMutablePointer<pthread_mutex_t>
     private let condition: UnsafeMutablePointer<pthread_cond_t>
@@ -33,7 +33,7 @@ final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
         }
     }
 
-    func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64 {
+    public func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64 {
         if cursor.value < sequence {
             pthread_mutex_lock(lock)
             while cursor.value < sequence {
@@ -47,12 +47,13 @@ final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
         repeat {
             try barrier.checkAlert()
             // TODO- figure out how to introduce __mm_pause or similar to mitigate cpu load from spinning here
+            // see https://github.com/tuplestream/swift-disruptor/issues/2
             availableSequence = dependentSequence.value
         } while availableSequence < sequence
         return availableSequence
     }
 
-    func signalAllWhenBlocking() {
+    public func signalAllWhenBlocking() {
         pthread_mutex_lock(lock)
         defer { pthread_mutex_unlock(lock) }
         pthread_cond_signal(condition)
@@ -60,7 +61,7 @@ final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
 
 }
 
-final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
+public final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
 
     private static let defaultRetries = 200
     private static let defaultSleep = 100
@@ -79,7 +80,7 @@ final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
         }
     }
 
-    func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64 {
+    public func waitFor(sequence: Int64, cursor: Sequence, dependentSequence: Sequence, barrier: SequenceBarrier) throws -> Int64 {
         var availableSequence = dependentSequence.value
         var counter = retries
 
@@ -91,7 +92,7 @@ final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
         return availableSequence
     }
 
-    func signalAllWhenBlocking() {
+    public func signalAllWhenBlocking() {
         // no-op
     }
 
