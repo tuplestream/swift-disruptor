@@ -5,7 +5,6 @@
 */
 import XCTest
 @testable import Disruptor
-import Concurrency
 
 class SequenceBarrierTests: XCTestCase {
 

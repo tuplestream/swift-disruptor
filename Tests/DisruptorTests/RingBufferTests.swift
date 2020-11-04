@@ -8,11 +8,13 @@ import XCTest
 
 class RingBufferTests: XCTestCase {
 
+    private var executor: DispatchQueue!
     private var ringBuffer: RingBuffer<StubEvent,StubEventFactory>!
     private var sequenceBarrier: SequenceBarrier!
     private var translator: StubEventTranslator!
 
     override func setUp() {
+        executor = DispatchQueue(label: "RingBufferTests")
         ringBuffer = RingBuffer<StubEvent, StubEventFactory>.createMultiProducer(factory: StubEventFactory(), bufferSize: 32)
         ringBuffer.addGatingSequences(sequences: NoOpEventProcessor(ringBuffer).sequence)
         sequenceBarrier = ringBuffer.newBarrier()
@@ -54,9 +56,9 @@ class RingBufferTests: XCTestCase {
 
     func testShouldWrap() {
         let offset: Int32 = 1000
-//        for i in 0..<ringBuffer.bufferSize + offset {
-//            ringBuffer.publishEvent(translator: translator, input: Int(i))
-//        }
+        for i in 0..<ringBuffer.bufferSize + offset {
+            ringBuffer.publishEvent(translator: translator, input: Int(i))
+        }
 
 //        print("NXT: \(ringBuffer.next())")
 //
