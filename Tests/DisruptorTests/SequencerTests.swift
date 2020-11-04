@@ -43,13 +43,13 @@ final class SequencerTests: XCTestCase {
         sequencer.addGatingSequences(sequences: [gatingSequence])
 
         XCTAssertTrue(sequencer.hasAvailableCapacity(required: 1))
-        XCTAssertTrue(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize)))
-        XCTAssertFalse(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize) + 1))
+        XCTAssertTrue(sequencer.hasAvailableCapacity(required: SequencerTests.bufferSize))
+        XCTAssertFalse(sequencer.hasAvailableCapacity(required: SequencerTests.bufferSize + 1))
 
         sequencer.publish(sequencer.next())
 
-        XCTAssertTrue(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize) - 1))
-        XCTAssertFalse(sequencer.hasAvailableCapacity(required: Int(SequencerTests.bufferSize)))
+        XCTAssertTrue(sequencer.hasAvailableCapacity(required: SequencerTests.bufferSize - 1))
+        XCTAssertFalse(sequencer.hasAvailableCapacity(required: SequencerTests.bufferSize))
     }
 
     func testShouldIndicateNoAvailableCapacity() {

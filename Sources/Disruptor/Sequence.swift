@@ -13,15 +13,10 @@ final class SequenceUtils {
         return getMinimumSequence(sequences: sequences, minimum: Int64.max)
     }
 
-    static func getMinimumSequence(holder: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>, minimum: Int64) -> Int64 {
+    static func getMinimumSequence(holder: ManagedAtomic<UnsafeMutablePointer<SequenceArrayNode>>, minimum: Int64) -> Int64 {
         var currentMin = minimum
-        if var head = holder.load(ordering: .relaxed).pointee {
-            repeat {
-                currentMin = min(head.sequence.value, currentMin)
-                if let next = head.next {
-                    head = next.pointee
-                }
-            } while head.next != nil
+        for sequence in holder.load(ordering: .sequentiallyConsistent).pointee.sequences {
+            currentMin = min(currentMin, sequence.value)
         }
         return currentMin
     }
@@ -85,7 +80,7 @@ public class Sequence: CustomStringConvertible {
 
     public var description: String {
         get {
-            return "Sequence(value=\(value))"
+            return "Sequence(cursor=\(value))"
         }
     }
 }

@@ -5,7 +5,7 @@
 */
 import Foundation
 
-public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSink where F.Event == E {
+public final class RingBuffer<E>: Cursored, Sequenced, EventSink {
     public typealias Event = E
 
     public let bufferSize: Int32
@@ -16,7 +16,7 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSin
     private let entries: [E]
     private let sequencer: Sequencer
 
-    init(_ factory: F, sequencer: Sequencer) {
+    init<F: EventFactory>(_ factory: F, sequencer: Sequencer) where F.Event == E {
         precondition(sequencer.bufferSize > 1, "bufferSize must not be less than 1")
         precondition(sequencer.bufferSize.nonzeroBitCount == 1, "bufferSize must be a power of 2")
 
@@ -31,9 +31,9 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSin
         self.sequencer = sequencer
     }
 
-    public static func createMultiProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E, F> where F.Event == E {
+    public static func createMultiProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
         let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: BlockingWaitStrategy())
-        return RingBuffer<E,F>(factory, sequencer: sequencer)
+        return RingBuffer<E>(factory, sequencer: sequencer)
     }
 
     func newBarrier(sequencesToTrack: Sequence...) -> SequenceBarrier {
@@ -48,7 +48,7 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSin
         sequencer.addGatingSequences(sequences: sequences)
     }
 
-    public func hasAvailableCapacity(required: Int) -> Bool {
+    public func hasAvailableCapacity(required: Int32) -> Bool {
         return sequencer.hasAvailableCapacity(required: required)
     }
 
@@ -58,6 +58,14 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSin
 
     public func next(_ n: Int32) -> Int64 {
         return sequencer.next(n)
+    }
+
+    public func tryNext() throws -> Int64 {
+        return try sequencer.tryNext()
+    }
+
+    public func tryNext(_ n: Int32) throws -> Int64 {
+        return try sequencer.tryNext(n)
     }
 
     public func get(sequence: Int64) -> E {
@@ -77,6 +85,18 @@ public final class RingBuffer<E, F: EventFactory>: Cursored, Sequenced, EventSin
         var e = get(sequence: sequence)
         translator.translateTo(&e, sequence: sequence, input: input)
         sequencer.publish(sequence)
+    }
+
+    public func tryPublishEvent<T: EventTranslator>(translator: T, input: T.Input) -> Bool where T.Event == E {
+        do {
+            let sequence = try sequencer.tryNext()
+            var element = get(sequence: sequence)
+            defer { sequencer.publish(sequence) }
+            translator.translateTo(&element, sequence: sequence, input: input)
+            return false
+        } catch {
+            return false
+        }
     }
 
     public var cursor: Int64 {

@@ -35,11 +35,11 @@ protocol EventProcessor {
 
 final class NoOpEventProcessor: EventProcessor {
 
-    class SequencerFollowingSequence<T,U: EventFactory>: Sequence where U.Event == T {
+    class SequencerFollowingSequence<T>: Sequence {
 
-        private let ringBuffer: RingBuffer<T,U>
+        private let ringBuffer: RingBuffer<T>
 
-        init(_ ringBuffer: RingBuffer<T, U>) {
+        init(_ ringBuffer: RingBuffer<T>) {
             self.ringBuffer = ringBuffer
             super.init(initialValue: MultiProducerSequencer.initialCursorValue)
         }
@@ -52,13 +52,19 @@ final class NoOpEventProcessor: EventProcessor {
                 super.value = newValue
             }
         }
+
+        override var description: String {
+            get {
+                return "NoOpEventProcessor(cursor=\(value))"
+            }
+        }
     }
 
     private let running = ManagedAtomic<Bool>(false)
     private(set) var sequence: Sequence
 
-    init<T, U>(_ ringBuffer: RingBuffer<T,U>) {
-        self.sequence = SequencerFollowingSequence<T,U>(ringBuffer)
+    init<T>(_ ringBuffer: RingBuffer<T>) {
+        self.sequence = SequencerFollowingSequence<T>(ringBuffer)
     }
 
     func halt() {

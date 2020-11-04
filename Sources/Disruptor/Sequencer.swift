@@ -10,9 +10,11 @@ import _Volatile
 public protocol Sequenced {
     var bufferSize: Int32 { get }
     var remainingCapacity: Int64 { get }
-    func hasAvailableCapacity(required: Int) -> Bool
+    func hasAvailableCapacity(required: Int32) -> Bool
     func next() -> Int64
     func next(_ n: Int32) -> Int64
+    func tryNext() throws -> Int64
+    func tryNext(_ n: Int32) throws -> Int64
     func publish(_ sequence: Int64)
     func publish(low: Int64, high: Int64)
 }
@@ -29,23 +31,36 @@ public protocol Sequencer: Sequenced, Cursored {
     func addGatingSequences(sequences: [Sequence])
 }
 
+struct InsufficientCapacityError: Error {}
+
+internal struct SequenceArrayNode: CustomStringConvertible {
+    let sequences: [Sequence]
+
+    var description: String {
+        get {
+            "[" + sequences.map { s in
+                return s.description
+            }.joined(separator: "] [") + "]"
+        }
+    }
+}
+
 protocol SequencerImpl: Sequencer, CustomStringConvertible {
 
     var internalCursor: Sequence { get }
     var waitStrategy: WaitStrategy { get }
-
+    var gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceArrayNode>> { get }
     func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier
-}
-
-struct SequenceNode {
-    let sequence: Sequence
-    let next: UnsafeMutablePointer<SequenceNode>?
 }
 
 extension SequencerImpl {
 
     func next() -> Int64 {
         return next(1)
+    }
+
+    func tryNext() throws -> Int64 {
+        return try tryNext(1)
     }
 
     var cursor: Int64 {
@@ -64,6 +79,38 @@ extension SequencerImpl {
         return ProcessingSequenceBarrier(sequencer: self, waitStrategy: waitStrategy, cursorSequence: internalCursor, dependentSequences: sequencesToTrack)
     }
 
+    func addGatingSequences(sequences: [Sequence]) {
+        if sequences.isEmpty {
+            return
+        }
+
+        var cursorSequence: Int64
+        var current: UnsafeMutablePointer<SequenceArrayNode>
+        var next: UnsafeMutablePointer<SequenceArrayNode>
+        var result: (exchanged: Bool, original: UnsafeMutablePointer<SequenceArrayNode>)
+
+        repeat {
+            current = gatingSequences.load(ordering: .sequentiallyConsistent)
+            next = UnsafeMutablePointer.allocate(capacity: 1)
+            next.initialize(to: SequenceArrayNode(sequences: current.pointee.sequences + sequences))
+
+            cursorSequence = self.cursor
+            for seq in sequences {
+                seq.value = cursorSequence
+            }
+
+            result = gatingSequences.compareExchange(expected: current, desired: next, ordering: .sequentiallyConsistent)
+        } while !result.exchanged
+
+        result.original.deallocate()
+
+        cursorSequence = self.cursor
+
+        for seq in sequences {
+            seq.value = cursorSequence
+        }
+    }
+
     internal func sleepNanos() {
         Thread.sleep(forTimeInterval: 0.0000000001)
     }
@@ -78,46 +125,20 @@ final class MultiProducerSequencer: SequencerImpl {
     private var availableBuffer: [Int32]
     private let indexMask: Int32
     private let indexShift: Int32
-    private let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>
+    internal let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceArrayNode>>
     internal let waitStrategy: WaitStrategy
 
     public private(set) var bufferSize: Int32
 
     public init(bufferSize: Int32, waitStrategy: WaitStrategy) {
-        let headNodePtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
-        headNodePtr.initialize(to: nil)
+        let headNodePtr = UnsafeMutablePointer<SequenceArrayNode>.allocate(capacity: 1)
+        headNodePtr.initialize(to: SequenceArrayNode(sequences: []))
         self.gatingSequences = ManagedAtomic(headNodePtr)
         self.bufferSize = bufferSize
         self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
         self.indexMask = bufferSize - 1
         self.indexShift = Int32(log2(Double(bufferSize)))
         self.waitStrategy = waitStrategy
-    }
-
-    func addGatingSequences(sequences: [Sequence]) {
-        if sequences.isEmpty {
-            return
-        }
-
-        // TODO just added 1st element for unit testing
-
-        var result: (exchanged: Bool, original: UnsafeMutablePointer<SequenceNode?>)
-
-        repeat {
-            let currentHead = gatingSequences.load(ordering: .sequentiallyConsistent)
-            let newHead: SequenceNode
-            if let existing = currentHead.pointee {
-                let nextPtr = UnsafeMutablePointer<SequenceNode>.allocate(capacity: 1)
-                nextPtr.initialize(to: existing)
-                newHead = SequenceNode(sequence: sequences[0], next: nextPtr)
-            } else {
-                newHead = SequenceNode(sequence: sequences[0], next: nil)
-            }
-            let newHeadPtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
-            newHeadPtr.initialize(to: newHead)
-
-            result = gatingSequences.compareExchange(expected: currentHead, desired: newHeadPtr, ordering: .sequentiallyConsistent)
-        } while !result.exchanged
     }
 
     var remainingCapacity: Int64 {
@@ -149,11 +170,11 @@ final class MultiProducerSequencer: SequencerImpl {
         return availableSequence
     }
 
-    public func hasAvailableCapacity(required: Int) -> Bool {
+    public func hasAvailableCapacity(required: Int32) -> Bool {
         return hasAvailableCapacity(required: required, cursorValue: internalCursor.value)
     }
 
-    private func hasAvailableCapacity(required: Int, cursorValue: Int64) -> Bool {
+    private func hasAvailableCapacity(required: Int32, cursorValue: Int64) -> Bool {
         let wrapPoint = (cursorValue + Int64(required)) - Int64(bufferSize)
         let cachedGatingSequence = gatingSequenceCache.value
 
@@ -193,6 +214,23 @@ final class MultiProducerSequencer: SequencerImpl {
                 break
             }
         }
+        return next
+    }
+
+    func tryNext(_ n: Int32) throws -> Int64 {
+        precondition(n > 0, "n must be > 0")
+
+        var current: Int64
+        var next: Int64
+        repeat {
+            current = internalCursor.value
+            next = current + Int64(n)
+
+            if !hasAvailableCapacity(required: n, cursorValue: current) {
+                throw InsufficientCapacityError()
+            }
+        } while !internalCursor.compareAndSet(expected: current, newValue: next)
+
         return next
     }
 
@@ -236,7 +274,7 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
     internal let waitStrategy: WaitStrategy
     internal let internalCursor: Sequence
 
-    private let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceNode?>>
+    internal let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceArrayNode>>
 
     let bufferSize: Int32
 
@@ -244,13 +282,9 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
         self.bufferSize = bufferSize
         self.waitStrategy = waitStrategy
         self.internalCursor = Sequence(initialValue: -1)
-        let rawPtr = UnsafeMutablePointer<SequenceNode?>.allocate(capacity: 1)
-        rawPtr.initialize(to: nil)
+        let rawPtr = UnsafeMutablePointer<SequenceArrayNode>.allocate(capacity: 1)
+        rawPtr.initialize(to: SequenceArrayNode(sequences: []))
         self.gatingSequences = ManagedAtomic(rawPtr)
-    }
-
-    func addGatingSequences(sequences: [Sequence]) {
-
     }
 
     func claim(sequence: Int64) {
@@ -274,7 +308,7 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
         }
     }
 
-    func hasAvailableCapacity(required: Int) -> Bool {
+    private func hasAvailableCapacity(required: Int32, doStore: Bool = false) -> Bool {
         let nxt = self.nextValue
         let wrapPoint = (nxt + Int64(required)) - Int64(bufferSize)
         let cachedGatingSequence = self.cachedValue
@@ -291,6 +325,10 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
             }
         }
         return true
+    }
+
+    func hasAvailableCapacity(required: Int32) -> Bool {
+        return hasAvailableCapacity(required: required, doStore: false)
     }
 
     func next(_ n: Int32) -> Int64 {
@@ -317,6 +355,17 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
         self.nextValue = nextSequence
 
         return nextSequence
+    }
+
+    func tryNext(_ n: Int32) throws -> Int64 {
+        precondition(n > 0, "n must be > 0")
+
+        if !hasAvailableCapacity(required: n, doStore: true) {
+            throw InsufficientCapacityError()
+        }
+
+        self.nextValue += 1
+        return self.nextValue
     }
 
     func publish(_ sequence: Int64) {

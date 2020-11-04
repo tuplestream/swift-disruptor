@@ -8,11 +8,11 @@ import XCTest
 
 class SequenceBarrierTests: XCTestCase {
 
-    private var ringBuffer: RingBuffer<StubEvent,StubEventFactory>!
+    private var ringBuffer: RingBuffer<StubEvent>!
     private var translator: StubEventTranslator!
 
     override func setUp() {
-        ringBuffer = RingBuffer<StubEvent, StubEventFactory>.createMultiProducer(factory: StubEventFactory(), bufferSize: 64)
+        ringBuffer = RingBuffer<StubEvent>.createMultiProducer(factory: StubEventFactory(), bufferSize: 64)
         ringBuffer.addGatingSequences(sequences: NoOpEventProcessor(ringBuffer).sequence)
         translator = StubEventTranslator()
     }
