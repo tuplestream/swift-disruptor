@@ -158,9 +158,43 @@ class RingBufferTests: XCTestCase {
         XCTAssertTrue(publisherComplete.load(ordering: .sequentiallyConsistent))
     }
 
-//    func testShouldPublishEvent() {
-//        let foo = RingBuffer.createSingleProducer(factory: StubEventFactory(), bufferSize: 16)
-//    }
+    func testShouldPublishEvent() {
+        ringBuffer = RingBuffer.createSingleProducer(factory: StubEventFactory(), bufferSize: 16)
+
+        XCTAssertEqual(-1, ringBuffer.cursor)
+
+        ringBuffer.publishEvent(translator: translator, input: 1337)
+        XCTAssertEqual(0, ringBuffer.cursor)
+        let _ = ringBuffer.tryPublishEvent(translator: translator, input: 1338)
+        XCTAssertEqual(1, ringBuffer.cursor)
+
+        XCTAssertEqual(ringBuffer.get(sequence: 0).i, 1337)
+        XCTAssertEqual(ringBuffer.get(sequence: 1).i, 1338)
+    }
+
+    func testShouldNotPublishEventsIfBatchIsLargerThanRingBuffer() {
+        // TODO support batching
+        // https://github.com/tuplestream/swift-disruptor/issues/4
+    }
+
+    func testShouldAddAndRemoveSequences() {
+        ringBuffer = RingBuffer.createSingleProducer(factory: StubEventFactory(), bufferSize: 16)
+
+        let s3 = Sequence()
+        let s7 = Sequence()
+        ringBuffer.addGatingSequences(sequences: s3, s7)
+
+        for _ in 0..<10 {
+            ringBuffer.publish(ringBuffer.next())
+        }
+
+        s3.value = 3
+        s7.value = 7
+
+        XCTAssertEqual(Int64(3), ringBuffer.minimumGatingSequence)
+        XCTAssertTrue(ringBuffer.removeGatingSequence(s3))
+        XCTAssertEqual(Int64(7), ringBuffer.minimumGatingSequence)
+    }
 }
 
 fileprivate class TestEventProcessor: EventProcessor {

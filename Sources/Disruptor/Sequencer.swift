@@ -29,6 +29,8 @@ public protocol Sequencer: Sequenced, Cursored {
     func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64
     func newBarrier(sequencesToTrack: [Sequence]) -> SequenceBarrier
     func addGatingSequences(sequences: [Sequence])
+    func removeGatingSequence(_ sequence: Sequence) -> Bool
+    var minimumSequence: Int64 { get }
 }
 
 struct InsufficientCapacityError: Error {}
@@ -108,6 +110,40 @@ extension SequencerImpl {
 
         for seq in sequences {
             seq.value = cursorSequence
+        }
+    }
+
+    func removeGatingSequence(_ sequence: Sequence) -> Bool {
+        var current: UnsafeMutablePointer<SequenceArrayNode>
+        var next: UnsafeMutablePointer<SequenceArrayNode>
+        var result: (exchanged: Bool, original: UnsafeMutablePointer<SequenceArrayNode>)
+
+        repeat {
+            current = gatingSequences.load(ordering: .sequentiallyConsistent)
+            let targetIndex = current.pointee.sequences.firstIndex { seq in
+                return seq === sequence
+            }
+            if targetIndex == nil {
+                return false
+            }
+
+            next = UnsafeMutablePointer.allocate(capacity: 1)
+            let updatedArray = current.pointee.sequences.filter { seq in
+                seq !== sequence
+            }
+            next.initialize(to: SequenceArrayNode(sequences: updatedArray))
+
+            result = gatingSequences.compareExchange(expected: current, desired: next, ordering: .sequentiallyConsistent)
+        } while !result.exchanged
+
+        result.original.deallocate()
+
+        return true
+    }
+
+    var minimumSequence: Int64 {
+        get {
+            return SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: internalCursor.value)
         }
     }
 

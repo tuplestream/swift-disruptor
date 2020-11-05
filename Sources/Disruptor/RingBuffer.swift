@@ -53,6 +53,10 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink {
         sequencer.addGatingSequences(sequences: sequences)
     }
 
+    func removeGatingSequence(_ sequence: Sequence) -> Bool {
+        return sequencer.removeGatingSequence(sequence)
+    }
+
     public func hasAvailableCapacity(required: Int32) -> Bool {
         return sequencer.hasAvailableCapacity(required: required)
     }
@@ -107,6 +111,12 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink {
     public var cursor: Int64 {
         get {
             return sequencer.cursor
+        }
+    }
+
+    public var minimumGatingSequence: Int64 {
+        get {
+            return sequencer.minimumSequence
         }
     }
 }
