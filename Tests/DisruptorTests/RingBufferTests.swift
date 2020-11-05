@@ -147,7 +147,7 @@ class RingBufferTests: XCTestCase {
 
         DispatchQueue.global().async(execute: work)
 
-        latch.await()
+        latch.await(timeout: 1)
 
         XCTAssertEqual(buffer2.cursor, Int64(ringBufferSize - 1))
         XCTAssertFalse(publisherComplete.load(ordering: .sequentiallyConsistent))

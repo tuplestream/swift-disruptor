@@ -69,19 +69,14 @@ public class CountDownLatch {
     /// - returns: true if the latch is counted down to zero. false if the timeout occurred before
     /// the latch reaches zero.
     @discardableResult
-    public func await(timeout: TimeInterval? = nil) -> Bool {
+    public func await(timeout: TimeInterval) -> Bool {
         // Use `AtomicInt` to avoid contention during counting down and waiting. This allows the
         // lock to be only acquired at the time when the latch switches from closed to open.
         guard conditionCount.load(ordering: .sequentiallyConsistent) > 0 else {
             return true
         }
 
-        let deadline: Date
-        if let timeout = timeout {
-            deadline = Date().addingTimeInterval(timeout)
-        } else {
-            deadline = Date.distantFuture
-        }
+        let deadline = Date().addingTimeInterval(timeout)
 
         condition.lock()
         defer {
