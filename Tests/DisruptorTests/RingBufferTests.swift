@@ -38,7 +38,27 @@ class RingBufferTests: XCTestCase {
     }
 
     func testShouldClaimAndGetInSeparateThread() {
-        // TODO
+        let barrier = ringBuffer.newBarrier(sequencesToTrack: [])
+        var event: StubEvent? = nil
+
+        let claimWorker = DispatchWorkItem {
+            let _ = try! barrier.waitFor(sequence: 0)
+            event = self.ringBuffer.get(sequence: 0)
+            print("BOOM! 💥")
+        }
+
+        DispatchQueue.global().async(execute: claimWorker)
+
+        let eventValue = 2701
+        ringBuffer.publishEvent(translator: StubEventTranslator(), input: eventValue)
+
+        claimWorker.wait()
+
+        if let e = event {
+            XCTAssertEqual(eventValue, e.i)
+        } else {
+            XCTFail("expected to receive event")
+        }
     }
 
     func testShouldClaimAndGetMultipleMessages() {
@@ -138,9 +158,9 @@ class RingBufferTests: XCTestCase {
         XCTAssertTrue(publisherComplete.load(ordering: .sequentiallyConsistent))
     }
 
-    func testShouldPublishEvent() {
-        
-    }
+//    func testShouldPublishEvent() {
+//        let foo = RingBuffer.createSingleProducer(factory: StubEventFactory(), bufferSize: 16)
+//    }
 }
 
 fileprivate class TestEventProcessor: EventProcessor {

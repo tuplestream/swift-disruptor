@@ -36,6 +36,11 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink {
         return RingBuffer<E>(factory, sequencer: sequencer)
     }
 
+    public static func createSingleProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
+        let sequencer = SingleProducerSequencer(bufferSize: bufferSize, waitStrategy: BlockingWaitStrategy())
+        return RingBuffer<E>(factory, sequencer: sequencer)
+    }
+
     func newBarrier(sequencesToTrack: Sequence...) -> SequenceBarrier {
         return sequencer.newBarrier(sequencesToTrack: sequencesToTrack)
     }
