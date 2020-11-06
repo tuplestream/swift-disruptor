@@ -23,7 +23,7 @@ public protocol Cursored {
     var cursor: Int64 { get }
 }
 
-public protocol Sequencer: Sequenced, Cursored {
+protocol Sequencer: Sequenced, Cursored {
     func claim(sequence: Int64)
     func isAvailable(sequence: Int64) -> Bool
     func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64

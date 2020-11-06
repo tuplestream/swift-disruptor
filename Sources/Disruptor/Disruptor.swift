@@ -9,11 +9,11 @@ public enum ProducerType {
     case single, multi
 }
 
-public class Disruptor<T> {
+public class Disruptor<E> {
 
 //    public let ringBuffer: RingBuffer<T>
 
-    public init(eventFactory: () -> T, ringBufferSize: Int) {
+    public init<F: EventFactory>(eventFactory: () -> F, ringBufferSize: Int) where F.Event == E {
 //        self.ringBuffer =
     }
 }

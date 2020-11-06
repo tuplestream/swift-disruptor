@@ -26,7 +26,7 @@ final class ProcessingSequenceBarrier: SequenceBarrier {
     // the Java implementation uses a boolean here but it's simpler to elide the
     // type conversions since we're using volatile shim to read & write. It's not
     // referenced in many places anyway
-    private var alerted: UnsafeMutablePointer<Int>
+    private let alerted: UnsafeMutablePointer<Int>
 
     init(sequencer: Sequencer, waitStrategy: WaitStrategy, cursorSequence: Sequence, dependentSequences: [Sequence]) {
         self.sequencer = sequencer

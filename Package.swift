@@ -9,6 +9,7 @@ let package = Package(
         .library(
             name: "Disruptor",
             targets: ["Disruptor"]),
+        .executable(name: "DisruptorBenchmark", targets: ["DisruptorBenchmark"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-atomics.git",from: "0.0.1"),
@@ -19,6 +20,8 @@ let package = Package(
             name: "Disruptor",
             dependencies: [.target(name: "_Volatile"),
                            .product(name: "Atomics", package: "swift-atomics")]),
+        .target(name: "DisruptorBenchmark",
+                dependencies: [.target(name: "Disruptor")]),
         .testTarget(
             name: "DisruptorTests",
             dependencies: [
