@@ -5,7 +5,12 @@
 */
 import Foundation
 
-public final class RingBuffer<E>: Cursored, Sequenced, EventSink {
+public protocol DataProvider {
+    associatedtype Event
+    func get(sequence: Int64) -> Event
+}
+
+public final class RingBuffer<E>: Cursored, Sequenced, EventSink, DataProvider {
     public typealias Event = E
 
     public let bufferSize: Int32
