@@ -1,7 +1,7 @@
 # swift-disruptor
 
 [![CircleCI](https://img.shields.io/circleci/build/github/tuplestream/swift-disruptor)](https://app.circleci.com/pipelines/github/tuplestream/swift-disruptor)
-[![Gitter](https://badges.gitter.im/tuplestream/community.svg)](https://gitter.im/tuplestream/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Gitter](https://badges.gitter.im/tuplestream/oss.svg)](https://gitter.im/tuplestream/oss?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 Disruptor is an (almost) pure-Swift implementation of the inter-thread messaging library & concurrent design pattern of the same name. It aims to reach feature parity with the [reference implementation by LMAX](https://github.com/LMAX-Exchange/disruptor).
 
