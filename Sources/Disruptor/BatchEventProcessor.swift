@@ -21,7 +21,7 @@ fileprivate enum State: Int, AtomicValue {
     case idle, halted, running
 }
 
-public final class BatchEventProcessor<E, D: DataProvider, H: EventHandler>: EventProcessor where D.Event == E, H.Event == E {
+public final class BatchEventProcessor<E, D: DataProvider, H: EventHandler>: EventProcessor, Runnable where D.Event == E, H.Event == E {
     typealias Event = E
 
     private let running = ManagedAtomic<State>(.idle)
@@ -49,7 +49,7 @@ public final class BatchEventProcessor<E, D: DataProvider, H: EventHandler>: Eve
         }
     }
 
-    func halt() {
+    public func halt() {
         running.store(.halted, ordering: .sequentiallyConsistent)
         sequenceBarrier.alert()
     }
@@ -71,6 +71,7 @@ public final class BatchEventProcessor<E, D: DataProvider, H: EventHandler>: Eve
                 repeat {
                     event = dataProvider.get(sequence: nextSequence)
                     eventHandler.onEvent(event!, sequence: nextSequence, endOfBatch: nextSequence == availableSequence)
+                    nextSequence += 1
                 } while nextSequence <= availableSequence
 
                 sequence.value = availableSequence

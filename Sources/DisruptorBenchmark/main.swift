@@ -4,28 +4,32 @@
  SPDX-License-Identifier: Apache-2.0
 */
 import Foundation
-import Dispatch
-import Disruptor
-import Atomics
 
-print("Starting benchmark...")
+extension Date {
 
-let queue = DispatchQueue(label: "justTesting")
-var counter = 0
-
-let max = 100000000
-for _ in 0..<max {
-    queue.async {
-        counter += 1
+    static func - (lhs: Date, rhs: Date) -> TimeInterval {
+        return lhs.timeIntervalSinceReferenceDate - rhs.timeIntervalSinceReferenceDate
     }
-    // comment out to stall submissions
-//    Thread.sleep(forTimeInterval: 0.0000001)
+
 }
 
-print("done queuing")
+protocol Benchmark {
 
-repeat {
-    Thread.sleep(forTimeInterval: 0.1)
-} while counter < max
+    var name: String { get }
+    func benchmarkRun()
+}
 
-print("done")
+extension Benchmark {
+
+    func perform() {
+        print("Starting \(name) benchmark run...")
+        let startTime = Date()
+        benchmarkRun()
+        let totalRunTime = Date() - startTime
+
+        print("Benchmark run for \(name) finished, took: \(totalRunTime)")
+    }
+}
+
+DisruptorBenchmark().perform()
+GCDBenchmark().perform()

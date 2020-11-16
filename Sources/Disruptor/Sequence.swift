@@ -63,7 +63,7 @@ public class Sequence: CustomStringConvertible {
     }
 
     internal func setVolatile(_ n: Int64) {
-        counter.store(n, ordering: .relaxed)
+        counter.store(n, ordering: .sequentiallyConsistent)
     }
 
     func addAndGet(_ increment: Int64) -> Int64 {

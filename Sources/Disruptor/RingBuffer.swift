@@ -37,12 +37,12 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink, DataProvider {
     }
 
     public static func createMultiProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
-        let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: BlockingWaitStrategy())
+        let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: SleepingWaitStrategy())
         return RingBuffer<E>(factory, sequencer: sequencer)
     }
 
     public static func createSingleProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
-        let sequencer = SingleProducerSequencer(bufferSize: bufferSize, waitStrategy: BlockingWaitStrategy())
+        let sequencer = SingleProducerSequencer(bufferSize: bufferSize, waitStrategy: SleepingWaitStrategy())
         return RingBuffer<E>(factory, sequencer: sequencer)
     }
 
@@ -95,10 +95,24 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink, DataProvider {
     }
 
     public func publishEvent<T: EventTranslator>(translator: T, input: T.Input) where T.Event == E {
-        let sequence = sequencer.next()
-        var e = get(sequence: sequence)
-        translator.translateTo(&e, sequence: sequence, input: input)
-        sequencer.publish(sequence)
+        publishEvents(translator: translator, input: [input])
+    }
+
+    public func publishEvents<T: EventTranslator>(translator: T, input: [T.Input]) where T.Event == E {
+        precondition(input.count <= bufferSize, "The ring buffer cannot accommodate \(input.count) entries, it only has space for \(bufferSize)")
+
+        let finalSequence = sequencer.next(Int32(input.count))
+        let initialSequence = finalSequence - Int64(input.count - 1)
+
+        defer { sequencer.publish(low: initialSequence, high: finalSequence) }
+
+        var sequence = initialSequence
+        for object in input {
+            let nextSequence = sequence + 1
+            var eventAtSequence = get(sequence: sequence)
+            translator.translateTo(&eventAtSequence, sequence: nextSequence, input: object)
+            sequence = nextSequence
+        }
     }
 
     public func tryPublishEvent<T: EventTranslator>(translator: T, input: T.Input) -> Bool where T.Event == E {

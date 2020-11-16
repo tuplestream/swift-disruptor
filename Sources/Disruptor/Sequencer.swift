@@ -158,7 +158,7 @@ final class MultiProducerSequencer: SequencerImpl {
 
     internal private(set) var internalCursor: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
     private let gatingSequenceCache: Sequence = Sequence(initialValue: MultiProducerSequencer.initialCursorValue)
-    private var availableBuffer: [Int32]
+    private var availableBuffer: [ManagedAtomic<Int32>]
     private let indexMask: Int32
     private let indexShift: Int32
     internal let gatingSequences: ManagedAtomic<UnsafeMutablePointer<SequenceArrayNode>>
@@ -171,7 +171,12 @@ final class MultiProducerSequencer: SequencerImpl {
         headNodePtr.initialize(to: SequenceArrayNode(sequences: []))
         self.gatingSequences = ManagedAtomic(headNodePtr)
         self.bufferSize = bufferSize
-        self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
+//        self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
+        var tmpAvailable: [ManagedAtomic<Int32>] = []
+        for _ in 0..<bufferSize {
+            tmpAvailable.append(ManagedAtomic<Int32>(-1))
+        }
+        self.availableBuffer = tmpAvailable
         self.indexMask = bufferSize - 1
         self.indexShift = Int32(log2(Double(bufferSize)))
         self.waitStrategy = waitStrategy
@@ -191,8 +196,9 @@ final class MultiProducerSequencer: SequencerImpl {
     func isAvailable(sequence: Int64) -> Bool {
         let index = calculateIndex(sequence)
         let flag = calculateAvailabilityFlag(sequence)
-        let bufferAddress = UnsafeMutablePointer<Int32>(mutating: availableBuffer).advanced(by: Int(index))
-        return volatile_load_int(UnsafeMutableRawPointer(bufferAddress)) == flag
+        return availableBuffer[Int(index)].load(ordering: .sequentiallyConsistent) == flag
+//        let bufferAddress = UnsafeMutablePointer<Int32>(mutating: availableBuffer).advanced(by: Int(index))
+//        return volatile_load_int(UnsafeMutableRawPointer(bufferAddress)) == flag
     }
 
     func getHighestPublishedSequence(lowerBound: Int64, availableSequence: Int64) -> Int64 {
@@ -289,8 +295,9 @@ final class MultiProducerSequencer: SequencerImpl {
     }
 
     private func setAvailableBufferValue(index: Int32, flag: Int32) {
-        let bufferAddress = UnsafeMutablePointer<Int32>(mutating: availableBuffer).advanced(by: Int(index))
-        volatile_store_int(UnsafeMutableRawPointer(bufferAddress), Int32(flag))
+        availableBuffer[Int(index)].store(flag, ordering: .sequentiallyConsistent)
+//        let bufferAddress = UnsafeMutablePointer<Int32>(mutating: availableBuffer).advanced(by: Int(index))
+//        volatile_store_int(UnsafeMutableRawPointer(bufferAddress), Int32(flag))
     }
 
     private func calculateIndex(_ sequence: Int64) -> Int32 {
@@ -301,6 +308,25 @@ final class MultiProducerSequencer: SequencerImpl {
         return Int32(sequence).bigEndian >> indexShift
     }
 }
+
+//struct SequencerFields {
+//    var p0: Int64 = 0
+//    var p1: Int64 = 0
+//    var p2: Int64 = 0
+//    var p3: Int64 = 0
+//    var p4: Int64 = 0
+//    var p5: Int64 = 0
+//    var p6: Int64 = 0
+//    var nextValue: Int64 = -1
+//    var cachedValue: Int64 = -1
+//    var p7: Int64 = 0
+//    var p8: Int64 = 0
+//    var p9: Int64 = 0
+//    var p10: Int64 = 0
+//    var p11: Int64 = 0
+//    var p12: Int64 = 0
+//    var p13: Int64 = 0
+//}
 
 final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
 
@@ -350,9 +376,9 @@ final class SingleProducerSequencer: SequencerImpl, CustomStringConvertible {
         let cachedGatingSequence = self.cachedValue
 
         if wrapPoint > cachedGatingSequence || cachedGatingSequence > nxt {
-            // if doStore {
-            //     internalCursor.setVolatile(nxt)
-            // }
+             if doStore {
+                 internalCursor.setVolatile(nxt)
+             }
             let minSequence = SequenceUtils.getMinimumSequence(holder: gatingSequences, minimum: nxt)
             self.cachedValue = minSequence
 
