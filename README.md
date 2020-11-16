@@ -5,7 +5,7 @@
 
 Disruptor is an (almost) pure-Swift implementation of the inter-thread messaging library & concurrent design pattern of the same name. It aims to reach feature parity with LMAX's reference implementation.
 
-Have a [read of the LMAX literature](http://lmax-exchange.github.io/disruptor/) if you're not familiar with the pattern.
+Have a [read of the LMAX literature](http://lmax-exchange.github.io/disruptor/) if you're not familiar with it.
 
 ## Getting started
 
