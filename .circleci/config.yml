@@ -7,6 +7,7 @@ jobs:
     steps:
       - checkout
       - run: swift test -Xcc -mcx16 -Xswiftc -DENABLE_DOUBLEWIDE_ATOMICS --verbose
+      - run: swift run -c release
   validate:
     docker:
       - image: m0wfo/tailor:0.12.0

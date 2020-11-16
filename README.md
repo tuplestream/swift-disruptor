@@ -13,13 +13,13 @@ Swift Disruptor uses [SwiftPM](https://swift.org/package-manager/) as its build 
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/tuplestream/swift-disruptor.git", from: "0.10.0")
+    .package(url: "https://github.com/tuplestream/swift-disruptor.git", from: "0.14.0")
 ]
 ```
 then add the `Disruptor` module to your target dependencies:
 
 ```swift
-dependencies: [.product(name: "Disruptor", package: "swift-disruptor"),]
+dependencies: [.product(name: "Disruptor", package: "swift-disruptor")]
 ```
 
 #### Integrating in your code
@@ -68,11 +68,11 @@ class LongEventTranslator: EventTranslator {
 }
 ```
 
-Finally we need to wire it all together- let's instantiate a disruptor (the ring buffer can be sized up pretty bit, but it should fit inside L3 cache and it _must_ be a power of 2):
+Finally we need to wire it all together- let's instantiate a disruptor (the ring buffer can be sized up pretty big, but it should fit inside L3 cache and it _must_ be a power of 2):
 
 ```swift
-// 5) Instantiate a Disruptor 
-let disruptor = Disruptor<LongEvent>(eventFactory: LongEventFactory(), ringBufferSize: 512, producerType: .single)
+// 5) Instantiate a Disruptor
+let disruptor = Disruptor<LongEvent>(eventFactory: LongEventFactory(), ringBufferSize: (1 << 16), producerType: .single)
 
 // let's just add a single consumer:
 disruptor.handleEventsWith(eventHandlers: [LongEventHandler()])
