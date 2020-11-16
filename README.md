@@ -1,4 +1,4 @@
-# swift-disruptor
+# Swift Disruptor 💥
 
 [![CircleCI](https://img.shields.io/circleci/build/github/tuplestream/swift-disruptor)](https://app.circleci.com/pipelines/github/tuplestream/swift-disruptor)
 [![Gitter](https://badges.gitter.im/tuplestream/oss.svg)](https://gitter.im/tuplestream/oss?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
