@@ -44,7 +44,6 @@ class RingBufferTests: XCTestCase {
         let claimWorker = DispatchWorkItem {
             let _ = try! barrier.waitFor(sequence: 0)
             event = self.ringBuffer.get(sequence: 0)
-            print("BOOM! 💥")
         }
 
         DispatchQueue.global().async(execute: claimWorker)

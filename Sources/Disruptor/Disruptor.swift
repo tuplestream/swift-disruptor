@@ -52,12 +52,12 @@ public class Disruptor<E> {
     private let started = ManagedAtomic<Bool>(false)
     private var consumers: [EventProcessor & Runnable] = []
 
-    public convenience init<F: EventFactory>(eventFactory: F, ringBufferSize: Int32, producerType: ProducerType = .multi) where F.Event == E {
+    public convenience init<F: EventFactory>(eventFactory: F, ringBufferSize: Int32, producerType: ProducerType = .multi, waitStrategy: WaitStrategy = SleepingWaitStrategy()) where F.Event == E {
         let rb: RingBuffer<E>
         if producerType == .multi {
-            rb = RingBuffer.createMultiProducer(factory: eventFactory, bufferSize: ringBufferSize)
+            rb = RingBuffer.createMultiProducer(factory: eventFactory, bufferSize: ringBufferSize, waitStrategy: waitStrategy)
         } else {
-            rb = RingBuffer.createSingleProducer(factory: eventFactory, bufferSize: ringBufferSize)
+            rb = RingBuffer.createSingleProducer(factory: eventFactory, bufferSize: ringBufferSize, waitStrategy: waitStrategy)
         }
         self.init(rb, BasicExecutor())
     }

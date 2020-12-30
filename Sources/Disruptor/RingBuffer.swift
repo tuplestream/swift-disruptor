@@ -36,13 +36,13 @@ public final class RingBuffer<E>: Cursored, Sequenced, EventSink, DataProvider {
         self.sequencer = sequencer
     }
 
-    public static func createMultiProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
-        let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: SleepingWaitStrategy())
+    public static func createMultiProducer<F: EventFactory>(factory: F, bufferSize: Int32, waitStrategy: WaitStrategy = SleepingWaitStrategy()) -> RingBuffer<E> where F.Event == E {
+        let sequencer = MultiProducerSequencer(bufferSize: bufferSize, waitStrategy: waitStrategy)
         return RingBuffer<E>(factory, sequencer: sequencer)
     }
 
-    public static func createSingleProducer<F: EventFactory>(factory: F, bufferSize: Int32) -> RingBuffer<E> where F.Event == E {
-        let sequencer = SingleProducerSequencer(bufferSize: bufferSize, waitStrategy: SleepingWaitStrategy())
+    public static func createSingleProducer<F: EventFactory>(factory: F, bufferSize: Int32, waitStrategy: WaitStrategy = SleepingWaitStrategy()) -> RingBuffer<E> where F.Event == E {
+        let sequencer = SingleProducerSequencer(bufferSize: bufferSize, waitStrategy: waitStrategy)
         return RingBuffer<E>(factory, sequencer: sequencer)
     }
 

@@ -15,7 +15,7 @@ public final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
     private let lock: UnsafeMutablePointer<pthread_mutex_t>
     private let condition: UnsafeMutablePointer<pthread_cond_t>
 
-    init() {
+    public init() {
         self.lock = UnsafeMutablePointer.allocate(capacity: 1)
         pthread_mutex_init(lock, nil)
         self.condition = UnsafeMutablePointer.allocate(capacity: 1)
@@ -63,13 +63,13 @@ public final class BlockingWaitStrategy: WaitStrategy, CustomStringConvertible {
 
 public final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
 
-    private static let defaultRetries = 200
-    private static let defaultSleep = 100
+    public static let defaultRetries = 200
+    public static let defaultSleep: UInt32 = 100
 
     private let retries: Int
-    private let sleepTimeNanoseconds: Int
+    private let sleepTimeNanoseconds: UInt32
 
-    init(retries: Int = SleepingWaitStrategy.defaultSleep, sleepTimeNanoseconds: Int = SleepingWaitStrategy.defaultSleep) {
+    public init(retries: Int = SleepingWaitStrategy.defaultRetries, sleepTimeNanoseconds: UInt32 = SleepingWaitStrategy.defaultSleep) {
         self.retries = retries
         self.sleepTimeNanoseconds = sleepTimeNanoseconds
     }
@@ -105,7 +105,7 @@ public final class SleepingWaitStrategy: WaitStrategy, CustomStringConvertible {
             counter -= 1
             sched_yield()
         } else {
-            Thread.sleep(forTimeInterval: 0.0000001)
+            usleep(sleepTimeNanoseconds)
         }
         return counter
     }
