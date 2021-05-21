@@ -171,7 +171,6 @@ final class MultiProducerSequencer: SequencerImpl {
         headNodePtr.initialize(to: SequenceArrayNode(sequences: []))
         self.gatingSequences = ManagedAtomic(headNodePtr)
         self.bufferSize = bufferSize
-//        self.availableBuffer = Array(repeating: -1, count: Int(bufferSize))
         var tmpAvailable: [ManagedAtomic<Int32>] = []
         for _ in 0..<bufferSize {
             tmpAvailable.append(ManagedAtomic<Int32>(-1))
